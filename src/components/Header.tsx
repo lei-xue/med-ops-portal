@@ -14,6 +14,7 @@ const NAV_ITEMS: {
   { href: "/orders", label: "Orders" },
   { href: "/medications", label: "Inventory" },
   { href: "/audit", label: "Audit log", roles: ["pharmacist", "admin"] },
+  { href: "/fhir", label: "FHIR feed" },
 ];
 
 export default async function Header() {

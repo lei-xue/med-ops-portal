@@ -31,7 +31,8 @@ The third domain rule is inventory: **filling an order decrements stock in the s
                        │  │ /orders      │        │ login & stock  │  │
                        │  │ /audit       │        │ forms (fetch)  │  │
                        │  │ /medications │        └───────┬────────┘  │
-                       │  └──────┬───────┘                │ HTTP      │
+                       │  │ /fhir        │                │ HTTP      │
+                       │  └──────┬───────┘                │           │
                        │         │ read via Drizzle       │           │
                        │         │                        ▼           │
                        │  proxy.ts (auth gate)  REST route handlers │
@@ -156,6 +157,26 @@ Tests run against a **real, dockerized PostgreSQL** (`db-test` service, port 543
 
 - **`tests/orderService.test.ts`** — the state machine (legal + illegal transitions), the role permission matrix, transactional fill behavior (stock decremented atomically, insufficient stock rolls back *everything* including the status update, audit row written in-transaction), low-stock boundary (`stockQuantity <= reorderThreshold`), and input validation.
 - **`tests/api.test.ts`** — integration over the actual Next.js route handlers: login as each role, the full `create → verify → fill → complete` lifecycle across roles with stock assertions, `401` without a session, `403` for illegal role actions (technician verify/cancel, pharmacist/admin inventory rules), `409` for invalid transitions and insufficient stock, `404` for unknown orders.
+- **`tests/fhir.test.ts`** — pure, offline (no network, no DB): feeds inline fixture Bundles through the FHIR mapping functions and asserts field mapping, missing-field tolerance, and that malformed bundles yield empty arrays instead of exceptions.
+
+## FHIR integration slice
+
+The `/fhir` page demonstrates a healthcare-interop read path alongside the portal's own workflow features. **FHIR (Fast Healthcare Interoperability Resources)** is the HL7 standard for exchanging healthcare data electronically: every piece of clinical or administrative information — a patient, a prescription, an observation — is a **Resource**, a small JSON object with a standard structure identified by a `resourceType` and `id`. FHIR servers expose resources over plain REST, so a search like `GET /Patient?_count=25` returns a **Bundle**: an envelope containing the matching resources.
+
+**Request flow (server-side only — no browser CORS, no API keys, read-only):**
+
+```
+Browser ──► /fhir page (login-protected RSC, revalidate = 300)
+                │  src/lib/fhir.ts fetches on the Next.js server
+                ▼
+          https://hapi.fhir.org/baseR4
+            Patient?_count=25
+            MedicationRequest?_count=25&_sort=-_lastUpdated
+```
+
+The browser never talks to the FHIR server directly. The Next.js server fetches the two search Bundles, maps them through tolerant pure mappers (`mapPatient`, `mapMedicationRequest` in `src/lib/fhir.ts`), and renders the tables. Responses are cached server-side for **5 minutes** (`revalidate = 300` on the page, matching `next: { revalidate: 300 }` on the fetches), so repeated visits don't hammer the sandbox. Each fetch has an **8-second timeout** and failures come back as typed results — a down or slow sandbox renders a friendly retry card instead of an error page, and a malformed resource is skipped, never thrown.
+
+**PHI, and why this demo is safe.** In a real deployment the fields rendered here — patient names, birth dates, gender, and the `subject` references that tie a MedicationRequest to a person — are **PHI (Protected Health Information)** under HIPAA/GDPR and would demand a BAA, field-level access controls, encryption, retention rules and a real audit trail. This demo never touches any of that: it reads **only** from the public HAPI R4 test sandbox (https://hapi.fhir.org/baseR4), which exists to serve synthetic test data, and it is **not connected to any real EHR/Epic environment**. The client is strictly read-only — no write path, no SMART-on-FHIR OAuth flow, no credentials — and the page keeps a visible "synthetic data" disclaimer on screen.
 
 ## Project layout
 
@@ -170,10 +191,14 @@ src/
     medications/              inventory table, low-stock highlight, admin
                               inline stock adjuster
     audit/                    filterable audit log (pharmacist/admin only)
+    fhir/                     read-only FHIR sandbox feed (patients +
+                              medication requests, 5-min server cache)
     api/                      REST route handlers (thin — see orderService)
   lib/
     orderService.ts           business rules: state machine, permissions,
                               transactions, audit rows, typed errors
+    fhir.ts                   read-only FHIR R4 client: typed mappers +
+                              sandbox fetches (timeout, typed results)
     permissions.ts            pure state machine + role matrix (client-safe)
     queries.ts                read models for pages (joins, filters, counts)
     session.ts                JWT mint/decode helpers (Auth.js v5 compatible)
@@ -202,7 +227,7 @@ tests/                        Vitest unit + integration suites
 - **Not HIPAA-compliant / not production-hardened.** No BAA, no encryption-at-rest configuration, no field-level access controls, no retention policy, no penetration testing. The audit log is a demo feature, not a compliance control.
 - **Credentials auth is for the demo.** Passwords are bcrypt-hashed, but there is no password reset, MFA, lockout, or email verification. Swap in your org's SSO/OIDC provider before real use (Auth.js v5 makes this a provider change, not a rewrite).
 - **Single-node assumptions.** `AUTH_SECRET` ships in `.env`/`.env.example` for demo convenience — generate your own. Docker Compose is not a production deployment.
-- **No external API calls.** Everything runs locally; nothing is deployed.
+- **One external call: the FHIR sandbox.** Everything else runs locally; nothing is deployed. The app makes exactly one kind of outbound request — read-only searches against the public HAPI FHIR R4 test server (synthetic data, see the FHIR section above) — and never sends credentials, user data, or PHI to it.
 
 ## Screenshots
 
