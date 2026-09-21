@@ -1,4 +1,6 @@
-{$DOMAIN:medops.leixue.dev} {
+# Cloudflare 代理终结 TLS（Full 模式），源站只讲 HTTP。
+# 这样无需源站证书，也不会出现 HTTP→HTTPS 回环。
+http://{$DOMAIN:medops.leixue.dev} {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:3000
 }
