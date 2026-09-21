@@ -1,6 +1,6 @@
-# Cloudflare 代理终结 TLS（Full 模式），源站只讲 HTTP。
-# 这样无需源站证书，也不会出现 HTTP→HTTPS 回环。
-http://{$DOMAIN:medops.leixue.dev} {
+# 源站由 Caddy 自动申请 Let's Encrypt 证书（HTTP-01 经 CF 代理透传）。
+# Cloudflare SSL 模式可用 Full / Full (strict)，端到端加密。
+{$DOMAIN:medops.leixue.dev} {
 	encode zstd gzip
 	reverse_proxy app:3000
 }
