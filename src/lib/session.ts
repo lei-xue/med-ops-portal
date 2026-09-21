@@ -56,7 +56,10 @@ export function sessionCookieOptions(secure: boolean): SessionCookieOptions {
   };
 }
 
-export async function mintSessionToken(user: SessionUser): Promise<string> {
+export async function mintSessionToken(
+  user: SessionUser,
+  secure: boolean,
+): Promise<string> {
   return encode({
     token: {
       sub: String(user.id),
@@ -65,7 +68,11 @@ export async function mintSessionToken(user: SessionUser): Promise<string> {
       role: user.role,
     },
     secret: requireAuthSecret(),
-    salt: SESSION_COOKIE_NAME,
+    // The salt MUST equal the cookie name the token will be stored under —
+    // Auth.js derives the decryption salt from the cookie name. Behind an
+    // HTTPS proxy the cookie is __Secure-authjs.session-token; minting with
+    // the plain name here is what made logins unreadable in production.
+    salt: sessionCookieName(secure),
     maxAge: SESSION_MAX_AGE_SECONDS,
   });
 }

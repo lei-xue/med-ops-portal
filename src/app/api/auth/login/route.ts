@@ -31,12 +31,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const token = await mintSessionToken(user);
+  const secure = isSecureRequest(req);
+  const token = await mintSessionToken(user, secure);
   const res = NextResponse.json({
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
   });
   res.cookies.set({
-    ...sessionCookieOptions(isSecureRequest(req)),
+    ...sessionCookieOptions(secure),
     value: token,
   });
 

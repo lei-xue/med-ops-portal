@@ -64,6 +64,33 @@ afterAll(async () => {
 });
 
 describe("POST /api/auth/login", () => {
+  it("mints a session readable over https (proxy salt parity)", async () => {
+    const user = await seedUser("pharmacist");
+    const loginRes = await loginPOST(
+      new NextRequest("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: new Headers({
+          "content-type": "application/json",
+          "x-forwarded-proto": "https",
+        }),
+        body: JSON.stringify({ email: user.email, password: TEST_PASSWORD }),
+      }),
+    );
+    expect(loginRes.status).toBe(200);
+    const setCookie = loginRes.headers.get("set-cookie");
+    expect(setCookie).toContain("__Secure-authjs.session-token=");
+    const cookie = setCookie!.split(";")[0];
+
+    const { readSessionFromRequest } = await import("@/lib/session");
+    const session = await readSessionFromRequest(
+      new NextRequest("http://localhost/api/orders", {
+        headers: new Headers({ "x-forwarded-proto": "https", cookie }),
+      }),
+    );
+    expect(session?.email).toBe(user.email);
+    expect(session?.role).toBe("pharmacist");
+  });
+
   it("rejects bad credentials with 401", async () => {
     const user = await seedUser("technician");
     const res = await loginPOST(
