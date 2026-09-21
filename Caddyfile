@@ -2,5 +2,5 @@
 # 这样无需源站证书，也不会出现 HTTP→HTTPS 回环。
 http://{$DOMAIN:medops.leixue.dev} {
 	encode zstd gzip
-	reverse_proxy 127.0.0.1:3000
+	reverse_proxy app:3000
 }
