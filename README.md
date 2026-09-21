@@ -231,4 +231,16 @@ tests/                        Vitest unit + integration suites
 
 ## Screenshots
 
-Skipped intentionally — run `npm run dev` and log in; the demo seed gives you a populated dashboard in seconds.
+Captured from the seeded demo (pharmacist role).
+
+| Dashboard | Orders |
+|---|---|
+| ![Dashboard — KPIs and recent activity](docs/screenshots/dashboard.png) | ![Orders — search, filters, role-aware actions](docs/screenshots/orders.png) |
+
+| Inventory | Audit log |
+|---|---|
+| ![Inventory — low-stock flags](docs/screenshots/inventory.png) | ![Audit log — every mutation, who/when/what](docs/screenshots/audit-log.png) |
+
+| FHIR feed |
+|---|
+| ![FHIR feed — live read-only HAPI R4 sandbox data](docs/screenshots/fhir-feed.png) |
