@@ -244,3 +244,28 @@ Captured from the seeded demo (pharmacist role).
 | FHIR feed |
 |---|
 | ![FHIR feed — live read-only HAPI R4 sandbox data](docs/screenshots/fhir-feed.png) |
+
+## Production deployment (Docker + Caddy)
+
+One-command deploy on any Linux host with Docker:
+
+```bash
+git clone <repo> && cd med-ops-portal
+cp /dev/null .env.prod   # fill in the three values below
+```
+
+`.env.prod`:
+
+```
+POSTGRES_USER=medops
+POSTGRES_PASSWORD=<generate: openssl rand -hex 24>
+AUTH_SECRET=<generate: openssl rand -hex 32>
+```
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+```
+
+- `docker-compose.prod.yml` runs **db** (Postgres 16, loopback-only), **app** (migrations + idempotent demo seed at boot, then Next.js), **caddy** (automatic HTTPS via `Caddyfile`, default domain `96.44.163.129.sslip.io` — override with `DOMAIN=your.domain`).
+- DB and app ports bind to `127.0.0.1`; only Caddy's 80/443 are public.
+- Demo logins (fictional data only): `tech@demo.local` / `pharmacist@demo.local` / `admin@demo.local`, password `demo1234!`.
