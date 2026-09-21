@@ -245,6 +245,12 @@ Captured from the seeded demo (pharmacist role).
 |---|
 | ![FHIR feed — live read-only HAPI R4 sandbox data](docs/screenshots/fhir-feed.png) |
 
+## Live demo
+
+**https://medops.leixue.dev** — deployed on a RackNerd VPS via `docker-compose.prod.yml` (Postgres + Next.js + Caddy, automatic Let's Encrypt TLS, origin hidden behind Cloudflare proxy).
+
+Demo logins (all data fictional): `tech@demo.local` / `pharmacist@demo.local` / `admin@demo.local` — password `demo1234!`.
+
 ## Production deployment (Docker + Caddy)
 
 One-command deploy on any Linux host with Docker:
