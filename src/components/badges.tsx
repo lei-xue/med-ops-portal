@@ -1,72 +1,61 @@
+import { TriangleAlert } from "lucide-react";
+
 import type { OrderStatus, UserRole } from "@/db/schema";
 import { ROLE_LABELS, STATUS_LABELS } from "@/lib/permissions";
 
-/** Position of each status along the happy path; cancelled sits off it. */
-const STAGE_INDEX: Record<OrderStatus, number> = {
-  pending: 1,
-  verified: 2,
-  filled: 3,
-  completed: 4,
-  cancelled: 0,
+export const STATUS_STYLES: Record<
+  OrderStatus,
+  { pill: string; dot: string }
+> = {
+  pending: { pill: "bg-amber-50 text-amber-800 ring-amber-200", dot: "bg-amber-500" },
+  verified: { pill: "bg-brand-50 text-brand-700 ring-brand-100", dot: "bg-brand-500" },
+  filled: { pill: "bg-violet-50 text-violet-700 ring-violet-200", dot: "bg-violet-500" },
+  completed: { pill: "bg-emerald-50 text-emerald-700 ring-emerald-200", dot: "bg-emerald-500" },
+  cancelled: { pill: "bg-slate-100 text-slate-600 ring-slate-200", dot: "bg-slate-400" },
 };
 
-/**
- * Four-segment track showing how far an order has moved through
- * pending → verified → filled → completed. Status is carried by shape and
- * position, not by colour, so the palette stays free for "needs attention".
- */
-export function StatusBadge({
-  status,
-  attention = false,
-}: {
-  status: OrderStatus;
-  attention?: boolean;
-}) {
-  const stage = STAGE_INDEX[status];
-  const cancelled = status === "cancelled";
+export function StatusBadge({ status }: { status: OrderStatus }) {
+  const style = STATUS_STYLES[status];
   return (
-    <span className="inline-flex items-center gap-2">
-      <span aria-hidden className="flex gap-0.5">
-        {[1, 2, 3, 4].map((n) => (
-          <span
-            key={n}
-            className={`h-2.5 w-2 ${
-              cancelled
-                ? "bg-rule-soft"
-                : n < stage
-                  ? "bg-ink"
-                  : n === stage
-                    ? attention
-                      ? "bg-signal"
-                      : "bg-ink"
-                    : "bg-rule"
-            }`}
-          />
-        ))}
-      </span>
-      <span
-        className={`label-mono ${
-          cancelled ? "text-ink-3 line-through" : "text-ink"
-        }`}
-      >
-        {STATUS_LABELS[status]}
-      </span>
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset ${style.pill}`}
+    >
+      <span aria-hidden className={`size-1.5 rounded-full ${style.dot}`} />
+      {STATUS_LABELS[status]}
     </span>
   );
 }
 
-export function RoleBadge({ role }: { role: UserRole }) {
+export function RoleBadge({
+  role,
+  tone = "light",
+}: {
+  role: UserRole;
+  tone?: "light" | "dark";
+}) {
   return (
-    <span className="label-mono inline-flex items-center border border-rule px-1.5 py-px text-ink-2">
+    <span
+      className={`inline-flex items-center rounded px-1.5 py-px text-[11px] font-medium ${
+        tone === "dark"
+          ? "bg-white/10 text-slate-300"
+          : "bg-slate-100 text-slate-600"
+      }`}
+    >
       {ROLE_LABELS[role]}
     </span>
   );
 }
 
-export function LowStockBadge() {
-  return (
-    <span className="label-mono inline-flex items-center bg-signal px-1.5 py-px font-semibold text-black">
-      Reorder
+export function StockBadge({ low }: { low: boolean }) {
+  return low ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 ring-1 ring-red-200 ring-inset">
+      <TriangleAlert aria-hidden className="size-3" />
+      Below reorder
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200 ring-inset">
+      <span aria-hidden className="size-1.5 rounded-full bg-emerald-500" />
+      In stock
     </span>
   );
 }

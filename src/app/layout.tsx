@@ -1,19 +1,21 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Schibsted_Grotesk } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 
-import Header from "@/components/Header";
+import { auth } from "@/auth";
+import AppShell from "@/components/AppShell";
 
 import "./globals.css";
 
-const grotesk = Schibsted_Grotesk({
-  variable: "--font-grotesk",
+const plexSans = IBM_Plex_Sans({
+  variable: "--font-plex-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 const plexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
@@ -25,23 +27,28 @@ export const metadata: Metadata = {
     "Medication operations portal demo — order workflow, inventory and audit trails. All data fictional.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const session = await auth();
+
   return (
     <html
       lang="en"
-      className={`${grotesk.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-paper text-ink">
-        <Header />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
-          {children}
-        </main>
-        <footer className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-6 text-ink-3 sm:px-6">
-          <span className="label-mono">MedOps Portal · demo build</span>
-          <span className="label-mono">
-            No PHI · no real patients · no dosing advice
-          </span>
-        </footer>
+      <body className="min-h-full bg-canvas text-slate-900">
+        {session ? (
+          <AppShell
+            user={{
+              name: session.user.name ?? "",
+              email: session.user.email ?? "",
+              role: session.user.role,
+            }}
+          >
+            {children}
+          </AppShell>
+        ) : (
+          children
+        )}
       </body>
     </html>
   );

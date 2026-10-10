@@ -1,11 +1,23 @@
 "use client";
 
+import {
+  CircleCheck,
+  PackageCheck,
+  ShieldCheck,
+  type LucideIcon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { btnPrimarySm, btnQuiet } from "@/components/ui";
+import { btnGhostDanger, btnPrimarySm } from "@/components/ui";
 import type { OrderStatus, UserRole } from "@/db/schema";
 import { ACTION_LABELS, legalActionsFor, type OrderAction } from "@/lib/permissions";
+
+const ACTION_ICONS: Partial<Record<OrderAction, LucideIcon>> = {
+  verify: ShieldCheck,
+  fill: PackageCheck,
+  complete: CircleCheck,
+};
 
 export default function OrderRowActions({
   orderId,
@@ -26,7 +38,7 @@ export default function OrderRowActions({
   );
 
   if (actions.length === 0 && !error) {
-    return <span className="text-xs text-ink-3">—</span>;
+    return <span className="text-xs text-slate-300">—</span>;
   }
 
   async function run(action: OrderAction) {
@@ -53,28 +65,27 @@ export default function OrderRowActions({
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <div className="flex items-center justify-end gap-2">
-        {actions.map((action) => (
-          <button
-            key={action}
-            type="button"
-            disabled={pendingAction !== null}
-            onClick={() => run(action)}
-            className={
-              action === "cancel"
-                ? btnQuiet
-                : btnPrimarySm
-            }
-          >
-            {pendingAction === action ? "…" : ACTION_LABELS[action]}
-            {action !== "cancel" && pendingAction !== action && (
-              <span aria-hidden>→</span>
-            )}
-          </button>
-        ))}
+      <div className="flex items-center justify-end gap-1">
+        {actions.map((action) => {
+          const Icon = ACTION_ICONS[action];
+          return (
+            <button
+              key={action}
+              type="button"
+              disabled={pendingAction !== null}
+              onClick={() => run(action)}
+              className={
+                action === "cancel" ? btnGhostDanger : `${btnPrimarySm} min-w-22`
+              }
+            >
+              {Icon && <Icon aria-hidden className="size-3.5" />}
+              {pendingAction === action ? "Working…" : ACTION_LABELS[action]}
+            </button>
+          );
+        })}
       </div>
       {error && (
-        <p role="alert" className="max-w-48 text-right text-xs text-danger">
+        <p role="alert" className="max-w-48 text-right text-xs text-red-600">
           {error}
         </p>
       )}

@@ -13,7 +13,7 @@ export function RelativeTime({
     <time
       dateTime={date.toISOString()}
       title={formatDateTime(date)}
-      className={`font-mono text-xs whitespace-nowrap tabular-nums ${className}`}
+      className={`text-xs whitespace-nowrap tabular-nums ${className}`}
     >
       {formatRelative(date)}
     </time>

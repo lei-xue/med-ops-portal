@@ -11,7 +11,8 @@ Live demo: https://medops.leixue.dev — logins `tech@demo.local`, `pharmacist@d
 | | |
 | --- | --- |
 | ![Orders](docs/screenshots/orders.png) | ![Inventory](docs/screenshots/inventory.png) |
-| ![Audit log](docs/screenshots/audit-log.png) | ![Dark mode](docs/screenshots/dashboard-dark.png) |
+| ![Audit log](docs/screenshots/audit-log.png) | ![New order](docs/screenshots/new-order.png) |
+| ![Sign in](docs/screenshots/login.png) | ![FHIR feed](docs/screenshots/fhir-feed.png) |
 
 </details>
 
@@ -20,7 +21,7 @@ Live demo: https://medops.leixue.dev — logins `tech@demo.local`, `pharmacist@d
 - Every mutation writes an `audit_logs` row in the same transaction; filling decrements stock atomically
 - Read-only `/fhir` page pulling synthetic data from the public HAPI R4 sandbox
 
-UI: "Rx label" look — cool paper and ink, IBM Plex Mono for codes and counts, one signal orange reserved for work waiting on you and stock below its reorder line. Order stage is drawn as a 4-segment track, not a colour. Follows the system light/dark setting.
+UI: clinical-console layout — navy sidebar, IBM Plex Sans/Mono, one medical blue for primary actions, muted semantic colours for order status and stock levels, Lucide icons. The dashboard is a role-aware work queue built around the order pipeline.
 
 Tech: Next.js 16 (App Router), React 19, TypeScript, Tailwind v4, PostgreSQL 16, Drizzle ORM, Auth.js v5, Vitest
 

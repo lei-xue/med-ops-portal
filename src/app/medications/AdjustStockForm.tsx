@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
-import { btnSecondarySm, fieldSm } from "@/components/ui";
+import { btnSecondary, fieldSm } from "@/components/ui";
 
 export default function AdjustStockForm({
   medicationId,
@@ -66,18 +66,20 @@ export default function AdjustStockForm({
           setQuantity(e.target.value);
           setSaved(false);
         }}
-        className={`${fieldSm} w-20 font-mono tabular-nums`}
+        className={`${fieldSm} w-24 tabular-nums`}
       />
       <button
         type="submit"
         disabled={pending}
-        className={btnSecondarySm}
+        className={btnSecondary}
       >
         {pending ? "…" : "Save"}
       </button>
-      {saved && <span className="label-mono text-ink-2">Saved</span>}
+      {saved && (
+        <span className="text-xs font-medium text-emerald-600">Saved</span>
+      )}
       {error && (
-        <span role="alert" className="max-w-36 text-xs text-danger">
+        <span role="alert" className="max-w-36 text-xs text-red-600">
           {error}
         </span>
       )}

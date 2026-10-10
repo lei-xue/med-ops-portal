@@ -3,7 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { panel } from "@/components/ui";
+import { PageHeader } from "@/components/PageHeader";
+import { card } from "@/components/ui";
 import { roleCan } from "@/lib/permissions";
 import { listMedications } from "@/lib/queries";
 import NewOrderForm from "./NewOrderForm";
@@ -16,14 +17,14 @@ export default async function NewOrderPage() {
 
   if (!roleCan(session.user.role, "create")) {
     return (
-      <div className={`mx-auto mt-10 max-w-md border-l-4 border-l-danger p-6 ${panel}`}>
+      <div className={`${card} mx-auto mt-10 max-w-md p-6 text-center`}>
         <h1 className="font-semibold">Not permitted</h1>
-        <p className="mt-1 text-sm text-ink-2">
+        <p className="mt-1 text-sm text-slate-500">
           Your role cannot create orders.
         </p>
         <Link
           href="/orders"
-          className="label-mono mt-4 inline-block text-ink-2 hover:text-ink"
+          className="mt-4 inline-block text-sm font-medium text-brand-600 hover:text-brand-700"
         >
           ← Back to orders
         </Link>
@@ -34,20 +35,16 @@ export default async function NewOrderPage() {
   const medications = await listMedications();
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
-      <div>
-        <Link href="/orders" className="label-mono text-ink-3 hover:text-ink">
-          ← Back to orders
-        </Link>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-          New order
-        </h1>
-        <p className="mt-2 text-sm text-ink-2">
-          Orders start as <strong className="text-ink">pending</strong> and
-          need pharmacist verification before they can be filled.
-        </p>
-      </div>
-
+    <>
+      <PageHeader
+        eyebrow={
+          <Link href="/orders" className="hover:text-brand-600">
+            ← Medication orders
+          </Link>
+        }
+        title="New medication order"
+        description="Orders start as pending and need pharmacist verification before they can be filled."
+      />
       <NewOrderForm
         medications={medications.map((m) => ({
           id: m.id,
@@ -58,6 +55,6 @@ export default async function NewOrderPage() {
           reorderThreshold: m.reorderThreshold,
         }))}
       />
-    </div>
+    </>
   );
 }

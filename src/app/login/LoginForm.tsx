@@ -51,7 +51,7 @@ export default function LoginForm() {
       <div>
         <label
           htmlFor="email"
-          className="label-mono mb-1.5 block text-ink-2"
+          className="mb-1.5 block text-sm font-medium text-slate-700"
         >
           Email
         </label>
@@ -69,7 +69,7 @@ export default function LoginForm() {
       <div>
         <label
           htmlFor="password"
-          className="label-mono mb-1.5 block text-ink-2"
+          className="mb-1.5 block text-sm font-medium text-slate-700"
         >
           Password
         </label>
@@ -88,7 +88,7 @@ export default function LoginForm() {
       {error && (
         <p
           role="alert"
-          className="border-l-4 border-danger bg-sunken px-3 py-2 text-sm text-ink"
+          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
         >
           {error}
         </p>
@@ -97,38 +97,38 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className={`${btnPrimary} w-full py-2.5`}
+        className={`${btnPrimary} h-10 w-full`}
       >
         {pending ? "Signing in…" : "Sign in"}
       </button>
 
-      <div className="perforation pt-1" />
-      <div>
-        <p className="label-mono mb-2 text-ink-3">
+      <div className="pt-4">
+        <div className="mb-3 flex items-center gap-3 text-xs text-slate-500">
+          <span className="h-px flex-1 bg-slate-200" />
           Demo accounts · password{" "}
-          <code className="normal-case">{DEMO_PASSWORD}</code>
-        </p>
-        <ul className="divide-y divide-rule-soft border border-rule">
+          <code className="font-mono text-slate-700">{DEMO_PASSWORD}</code>
+          <span className="h-px flex-1 bg-slate-200" />
+        </div>
+        <div className="grid grid-cols-3 gap-2">
           {DEMO_ACCOUNTS.map((account) => (
-            <li key={account.email}>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail(account.email);
-                  setPassword(DEMO_PASSWORD);
-                }}
-                className={`focus-ink flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-sunken ${
-                  email === account.email ? "bg-sunken" : ""
-                }`}
-              >
-                <span className="font-medium">{account.label}</span>
-                <span className="font-mono text-xs text-ink-3">
-                  {account.email}
-                </span>
-              </button>
-            </li>
+            <button
+              key={account.email}
+              type="button"
+              onClick={() => {
+                setEmail(account.email);
+                setPassword(DEMO_PASSWORD);
+              }}
+              title={account.email}
+              className={`rounded-md border px-2 py-2 text-xs font-medium transition-colors ${
+                email === account.email
+                  ? "border-brand-500 bg-brand-50 text-brand-700"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              {account.label}
+            </button>
           ))}
-        </ul>
+        </div>
       </div>
     </form>
   );

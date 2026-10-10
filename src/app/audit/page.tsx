@@ -3,11 +3,22 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { Avatar } from "@/components/Avatar";
 import { RoleBadge } from "@/components/badges";
+import { AUDIT_FALLBACK, AUDIT_ICONS } from "@/components/icons";
+import { PageHeader } from "@/components/PageHeader";
 import { RelativeTime } from "@/components/RelativeTime";
-import { btnSecondary, fieldSm, panel, td, th } from "@/components/ui";
+import {
+  btnSecondary,
+  btnSecondarySm,
+  card,
+  fieldSm,
+  td,
+  th,
+} from "@/components/ui";
 import type { UserRole } from "@/db/schema";
 import { describeAudit } from "@/lib/audit";
+import { formatDateTime } from "@/lib/format";
 import { AUDIT_ACTIONS } from "@/lib/permissions";
 import { listActors, listAuditLogs } from "@/lib/queries";
 
@@ -60,139 +71,166 @@ export default async function AuditPage({ searchParams }: AuditPageProps) {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="label-mono text-ink-3">
-          {total} entr{total === 1 ? "y" : "ies"} · written in the same
-          transaction as the change
-        </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-          Audit log
-        </h1>
-      </div>
+    <>
+      <PageHeader
+        title="Audit log"
+        description="Every mutation is written in the same database transaction that applied it, so the trail can't drift from the data."
+      />
 
-      <form
-        action="/audit"
-        className="flex flex-col gap-2 sm:flex-row sm:items-center"
-      >
-        <select
-          name="action"
-          aria-label="Action"
-          defaultValue={action ?? ""}
-          className={fieldSm}
+      <div className={`${card} overflow-hidden`}>
+        <form
+          action="/audit"
+          className="flex flex-col gap-2 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center"
         >
-          <option value="">All actions</option>
-          {AUDIT_ACTIONS.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </select>
-        <select
-          name="actor"
-          aria-label="Actor"
-          defaultValue={actorId ? String(actorId) : ""}
-          className={fieldSm}
-        >
-          <option value="">All actors</option>
-          {actors.map((actor) => (
-            <option key={actor.id} value={actor.id}>
-              {actor.name} ({actor.role})
-            </option>
-          ))}
-        </select>
-        <label className="flex items-center gap-2 px-1 text-sm text-ink-2">
-          <input
-            type="checkbox"
-            name="logins"
-            value="1"
-            defaultChecked={includeLogins}
-            className="size-4 accent-current"
-          />
-          Include sign-ins
-        </label>
-        <button type="submit" className={btnSecondary}>
-          Apply filters
-        </button>
-      </form>
-
-      <div className={`overflow-x-auto ${panel}`}>
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-rule bg-sunken">
-            <tr>
-              <th className={th}>When</th>
-              <th className={th}>Actor</th>
-              <th className={th}>Action</th>
-              <th className={th}>What happened</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-rule-soft">
-            {rows.map((row) => (
-              <tr key={row.id} className="align-top hover:bg-sunken">
-                <td className={`${td} text-ink-2`}>
-                  <RelativeTime value={row.createdAt} />
-                </td>
-                <td className={`${td} whitespace-nowrap`}>
-                  <span className="font-medium">{row.actorName}</span>{" "}
-                  <RoleBadge role={row.actorRole as UserRole} />
-                </td>
-                <td className={td}>
-                  <code className="font-mono text-xs text-ink">
-                    {row.action}
-                  </code>
-                  <span className="block font-mono text-xs text-ink-3">
-                    {row.entityType} #{row.entityId}
-                  </span>
-                </td>
-                <td className={`${td} max-w-md`}>
-                  <span className="text-ink-2">{describeAudit(row)}</span>
-                  {row.details != null && (
-                    <code
-                      title={JSON.stringify(row.details)}
-                      className="mt-0.5 block truncate font-mono text-xs text-ink-3"
-                    >
-                      {JSON.stringify(row.details)}
-                    </code>
-                  )}
-                </td>
-              </tr>
+          <select
+            name="action"
+            aria-label="Action"
+            defaultValue={action ?? ""}
+            className={fieldSm}
+          >
+            <option value="">All actions</option>
+            {AUDIT_ACTIONS.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
             ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-12 text-center text-ink-2">
-                  No audit entries match the current filters.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {pageCount > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="label-mono text-ink-3">
-            Page {page} / {pageCount}
+          </select>
+          <select
+            name="actor"
+            aria-label="Actor"
+            defaultValue={actorId ? String(actorId) : ""}
+            className={fieldSm}
+          >
+            <option value="">All users</option>
+            {actors.map((actor) => (
+              <option key={actor.id} value={actor.id}>
+                {actor.name} ({actor.role})
+              </option>
+            ))}
+          </select>
+          <label className="flex items-center gap-2 px-1 text-sm text-slate-600">
+            <input
+              type="checkbox"
+              name="logins"
+              value="1"
+              defaultChecked={includeLogins}
+              className="size-4 rounded border-slate-300 accent-brand-600"
+            />
+            Include sign-ins
+          </label>
+          <button type="submit" className={btnSecondary}>
+            Apply filters
+          </button>
+          <span className="text-xs text-slate-500 sm:ml-auto">
+            {total} entr{total === 1 ? "y" : "ies"}
           </span>
-          <div className="flex gap-2">
-            {page > 1 && (
-              <Link
-                href={buildHref({ page: String(page - 1) })}
-                className={btnSecondary}
-              >
-                ← Previous
-              </Link>
-            )}
-            {page < pageCount && (
-              <Link
-                href={buildHref({ page: String(page + 1) })}
-                className={btnSecondary}
-              >
-                Next →
-              </Link>
-            )}
-          </div>
+        </form>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-3xl text-left text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className={th}>Event</th>
+                <th className={th}>User</th>
+                <th className={th}>Record</th>
+                <th className={th}>Timestamp</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map((row) => {
+                const { icon: Icon, tint } =
+                  AUDIT_ICONS[row.action] ?? AUDIT_FALLBACK;
+                return (
+                  <tr key={row.id} className="align-top hover:bg-slate-50/70">
+                    <td className={td}>
+                      <div className="flex gap-3">
+                        <span
+                          className={`grid size-7 shrink-0 place-items-center rounded-full ${tint}`}
+                        >
+                          <Icon aria-hidden className="size-3.5" />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="text-slate-800 first-letter:uppercase">
+                            {describeAudit(row)}
+                          </div>
+                          {row.details != null && (
+                            <code
+                              title={JSON.stringify(row.details)}
+                              className="mt-0.5 block max-w-md truncate font-mono text-[11px] text-slate-400"
+                            >
+                              {JSON.stringify(row.details)}
+                            </code>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className={td}>
+                      <div className="flex items-center gap-2 whitespace-nowrap">
+                        <Avatar name={row.actorName} size="sm" />
+                        <span className="font-medium">{row.actorName}</span>
+                        <RoleBadge role={row.actorRole as UserRole} />
+                      </div>
+                    </td>
+                    <td className={td}>
+                      <code className="font-mono text-xs text-slate-700">
+                        {row.action}
+                      </code>
+                      <div className="text-xs text-slate-500">
+                        {row.entityType} #{row.entityId}
+                      </div>
+                    </td>
+                    <td className={`${td} whitespace-nowrap`}>
+                      <div className="text-slate-700">
+                        {formatDateTime(row.createdAt)}
+                      </div>
+                      <RelativeTime
+                        value={row.createdAt}
+                        className="text-slate-400"
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+              {rows.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-4 py-14 text-center text-sm text-slate-500"
+                  >
+                    No audit entries match the current filters.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
-    </div>
+
+        {pageCount > 1 && (
+          <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3">
+            <span className="text-xs text-slate-500">
+              Page {page} of {pageCount}
+            </span>
+            <div className="flex gap-2">
+              {page > 1 && (
+                <Link
+                  href={buildHref({ page: String(page - 1) })}
+                  className={btnSecondarySm}
+                >
+                  Previous
+                </Link>
+              )}
+              {page < pageCount && (
+                <Link
+                  href={buildHref({ page: String(page + 1) })}
+                  className={btnSecondarySm}
+                >
+                  Next
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
