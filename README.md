@@ -53,14 +53,15 @@ Other scripts: `build`, `start`, `lint`, `typecheck`, `db:migrate:test`.
 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 ```
 
-Runs Postgres, the app (migrates + seeds at boot, as the unprivileged `node` user) and Caddy (automatic HTTPS, HSTS; domain set in `Caddyfile`). Caddy waits for the app's `/api/health` check. Only ports 80/443 are public. Generate secrets with `openssl rand -hex 32`.
+Runs Postgres, the app (migrates + seeds at boot, as the unprivileged `node` user) and Caddy (automatic HTTPS, HSTS; domain set in `Caddyfile`). Caddy waits for the app's `/api/health` check. Only ports 80/443 are public. Generate secrets with `openssl rand -hex 32` (hex keeps the Postgres password URL-safe, which matters because compose builds `DATABASE_URL` from it).
 
 ## Security notes
 
 What is in place:
 
 - Passwords: bcrypt, constant-time rejection of unknown emails, one generic error message
-- Login: rate limited per account and per address (429 with `Retry-After`); failed attempts on real accounts are audited with IP and user agent, never the password
+- Login: rate limited per account, per address and per account across addresses (429 with `Retry-After`); failed attempts on real accounts are audited with IP and user agent, never the password
+- Client IP: taken from `X-Real-IP`, which Caddy sets and clients can't forge (forwarded headers are honoured only from Cloudflare's ranges)
 - Sessions: HttpOnly, SameSite=Lax cookies, `__Secure-` prefixed behind HTTPS; tokens with an unknown role are treated as signed out
 - Authorization: every API route checks the session and role on the server; every page redirects to `/login` on its own, not only via the proxy
 - Redirects: `callbackUrl` is resolved and must stay same-origin (`//host`, `/\host` and similar are rejected)
@@ -72,7 +73,7 @@ Known trade-offs (deliberate for a demo):
 
 - Sessions are stateless JWTs valid for 7 days. Deactivating a user or changing a role takes effect when the token expires; a real deployment would shorten the lifetime and re-check the role against the database, or keep a revocation list.
 - The login rate limiter is in memory, so it is per instance and resets on restart. More than one replica would need a shared store such as Redis.
-- Client IPs come from `CF-Connecting-IP` / `X-Forwarded-For`, which are trustworthy only because the app is reachable solely through Caddy behind Cloudflare.
+- Caddy trusts `CF-Connecting-IP` only from Cloudflare's IP ranges, which are pinned in the `Caddyfile` and need refreshing if Cloudflare changes them.
 - `audit_logs` is append-only by convention in the application; the database role is not yet restricted from `UPDATE`/`DELETE` on it.
 - Demo accounts and their shared password are public on purpose. There is no password reset, MFA or account lockout.
 

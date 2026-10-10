@@ -282,7 +282,7 @@ describe("API role enforcement", () => {
       req(`/api/medications/${med.id}/adjust-stock`, {
         method: "POST",
         cookie: pharmCookie,
-        body: { quantity: 500 },
+        body: { quantity: 500, expectedQuantity: 0 },
       }),
       { params: Promise.resolve({ id: String(med.id) }) },
     );
@@ -292,7 +292,7 @@ describe("API role enforcement", () => {
       req(`/api/medications/${med.id}/adjust-stock`, {
         method: "POST",
         cookie: techCookie,
-        body: { quantity: 500 },
+        body: { quantity: 500, expectedQuantity: 0 },
       }),
       { params: Promise.resolve({ id: String(med.id) }) },
     );
@@ -381,6 +381,39 @@ describe("API role enforcement", () => {
 });
 
 describe("inventory adjust through the API", () => {
+  it("requires expectedQuantity so writes can't skip the concurrency check", async () => {
+    const admin = await seedUser("admin");
+    const med = await seedMedication(10, 5);
+    const adminCookie = await login(admin.email);
+
+    const res = await adjustStockPOST(
+      req(`/api/medications/${med.id}/adjust-stock`, {
+        method: "POST",
+        cookie: adminCookie,
+        body: { quantity: 50 },
+      }),
+      { params: Promise.resolve({ id: String(med.id) }) },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("409s with STALE_STOCK when stock moved since the admin loaded it", async () => {
+    const admin = await seedUser("admin");
+    const med = await seedMedication(10, 5);
+    const adminCookie = await login(admin.email);
+
+    const res = await adjustStockPOST(
+      req(`/api/medications/${med.id}/adjust-stock`, {
+        method: "POST",
+        cookie: adminCookie,
+        body: { quantity: 50, expectedQuantity: 12 },
+      }),
+      { params: Promise.resolve({ id: String(med.id) }) },
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "STALE_STOCK" });
+  });
+
   it("admin adjusts stock; audit row records from/to", async () => {
     const admin = await seedUser("admin");
     const med = await seedMedication(10, 5);
@@ -390,7 +423,7 @@ describe("inventory adjust through the API", () => {
       req(`/api/medications/${med.id}/adjust-stock`, {
         method: "POST",
         cookie: adminCookie,
-        body: { quantity: 100, reason: "delivery received" },
+        body: { quantity: 100, reason: "delivery received", expectedQuantity: 10 },
       }),
       { params: Promise.resolve({ id: String(med.id) }) },
     );
@@ -415,7 +448,7 @@ describe("inventory adjust through the API", () => {
       req(`/api/medications/${med.id}/adjust-stock`, {
         method: "POST",
         cookie: adminCookie,
-        body: { quantity: -5 },
+        body: { quantity: -5, expectedQuantity: 100 },
       }),
       { params: Promise.resolve({ id: String(med.id) }) },
     );
@@ -441,6 +474,23 @@ describe("login hardening", () => {
     const blocked = await attempt();
     expect(blocked.status).toBe(429);
     expect(Number(blocked.headers.get("retry-after"))).toBeGreaterThan(0);
+  });
+
+  it("limits attempts on one account even when they come from many addresses", async () => {
+    const user = await seedUser("technician");
+    const statuses: number[] = [];
+    for (let i = 0; i < 21; i += 1) {
+      const res = await loginPOST(
+        req("/api/auth/login", {
+          method: "POST",
+          body: { email: user.email, password: "wrong-password" },
+          headers: { "x-real-ip": `198.51.100.${i}` },
+        }),
+      );
+      statuses.push(res.status);
+    }
+    expect(statuses.slice(0, 20).every((s) => s === 401)).toBe(true);
+    expect(statuses[20]).toBe(429);
   });
 
   it("audits failed sign-ins on existing accounts with IP and user agent", async () => {
@@ -489,5 +539,39 @@ describe("GET /api/health", () => {
     const res = await healthGET();
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ status: "ok" });
+  });
+});
+
+describe("page proxy", () => {
+  type Proxy = (r: NextRequest, ctx: unknown) => Promise<Response>;
+  // Auth.js rebuilds the request URL from Host and X-Forwarded-Proto
+  // (defaulting to https). Browsers send Host and Caddy sets the protocol.
+  const page = (url: string, cookie?: string) =>
+    req(url, {
+      cookie,
+      headers: { host: "localhost", "x-forwarded-proto": "http" },
+    });
+
+  it("sends signed-out visitors to /login, keeping path and query", async () => {
+    const proxy = (await import("@/proxy")).default as unknown as Proxy;
+    const res = await proxy(page("/orders?status=pending"), {});
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("location")!);
+    expect(location.pathname).toBe("/login");
+    expect(location.searchParams.get("callbackUrl")).toBe(
+      "/orders?status=pending",
+    );
+  });
+
+  it("lets signed-in users through and bounces them off /login", async () => {
+    const proxy = (await import("@/proxy")).default as unknown as Proxy;
+    const user = await seedUser("pharmacist");
+    const cookie = await login(user.email);
+
+    const orders = await proxy(page("/orders", cookie), {});
+    expect(orders.headers.get("location")).toBeNull();
+
+    const loginPage = await proxy(page("/login", cookie), {});
+    expect(new URL(loginPage.headers.get("location")!).pathname).toBe("/");
   });
 });

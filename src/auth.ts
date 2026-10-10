@@ -26,11 +26,11 @@ export const { auth } = NextAuth({
       session.user.id = token.sub ?? "";
       // Fail closed: a token without a known role is treated as signed out
       // by every page (they all check session.user.role).
-      session.user.role = (
-        typeof role === "string" && (USER_ROLES as readonly string[]).includes(role)
-          ? role
-          : undefined
-      ) as UserRole;
+      session.user.role =
+        typeof role === "string" &&
+        (USER_ROLES as readonly string[]).includes(role)
+          ? (role as UserRole)
+          : undefined;
       return session;
     },
   },

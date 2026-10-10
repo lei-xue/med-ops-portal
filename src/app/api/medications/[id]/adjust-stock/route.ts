@@ -18,7 +18,8 @@ const adjustStockSchema = z.object({
     .min(0, "Quantity cannot be negative.")
     .max(1_000_000, "Quantity is unreasonably large."),
   reason: z.string().trim().max(200).optional(),
-  expectedQuantity: z.number().int().min(0).optional(),
+  // Required: absolute writes without it could silently overwrite a fill.
+  expectedQuantity: z.number().int().min(0),
 });
 
 export async function POST(

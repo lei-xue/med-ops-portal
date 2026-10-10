@@ -13,6 +13,13 @@ export default defineConfig({
     fileParallelism: false,
     testTimeout: 30_000,
     hookTimeout: 30_000,
+    server: {
+      deps: {
+        // next-auth imports "next/server" without an extension, which Node's
+        // ESM loader rejects; let Vite resolve it (needed by the proxy tests).
+        inline: ["next-auth"],
+      },
+    },
   },
   resolve: {
     alias: {

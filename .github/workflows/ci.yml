@@ -42,8 +42,36 @@ jobs:
           AUTH_SECRET: ci-secret
 
   docker:
-    # Catches a broken Dockerfile or boot script before deploy time.
+    # Catches a broken Dockerfile, boot script or file permission before
+    # deploy time: build the image, then boot it against a real database.
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: medops
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d medops"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t medops:ci .
+      - name: Boot the image and wait for /api/health
+        run: |
+          docker run -d --name medops --network host \
+            -e PORT=3000 \
+            -e DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/medops \
+            -e AUTH_SECRET=ci-secret -e AUTH_TRUST_HOST=true \
+            medops:ci
+          for i in $(seq 60); do
+            if curl -fsS localhost:3000/api/health; then exit 0; fi
+            sleep 2
+          done
+          docker logs medops
+          exit 1

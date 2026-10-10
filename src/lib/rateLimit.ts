@@ -11,11 +11,13 @@ export class RateLimiter {
   constructor(
     private readonly limit: number,
     private readonly windowMs: number,
+    /** Hard cap on tracked keys so a flood of distinct keys can't grow memory unbounded. */
+    private readonly maxKeys = 10_000,
   ) {}
 
   /** Count one hit for `key`. Returns seconds to wait when over the limit. */
   hit(key: string, now = Date.now()): { ok: true } | { ok: false; retryAfter: number } {
-    if (this.hits.size > 10_000) this.prune(now);
+    if (this.hits.size >= this.maxKeys) this.prune(now);
 
     const entry = this.hits.get(key);
     if (!entry || entry.resetAt <= now) {
@@ -34,9 +36,21 @@ export class RateLimiter {
     else this.hits.delete(key);
   }
 
+  /** Drop expired keys; if still full, evict the oldest (Maps keep insertion order). */
   private prune(now: number): void {
     for (const [key, entry] of this.hits) {
       if (entry.resetAt <= now) this.hits.delete(key);
     }
+    const excess = this.hits.size - Math.floor(this.maxKeys * 0.9);
+    if (excess <= 0) return;
+    let removed = 0;
+    for (const key of this.hits.keys()) {
+      if (removed++ >= excess) break;
+      this.hits.delete(key);
+    }
+  }
+
+  get size(): number {
+    return this.hits.size;
   }
 }

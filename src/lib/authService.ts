@@ -88,17 +88,15 @@ export async function recordFailedLogin(
 const inFlight = new Set<Promise<void>>();
 
 /**
- * Write the failed-login audit row without making the caller wait, so an
- * existing account isn't slower to reject than an unknown email.
+ * Let a login audit write finish without making the response wait. For
+ * failures this also keeps an existing account from being slower to reject
+ * than an unknown email. The writes catch their own errors.
  */
-export function recordFailedLoginInBackground(
-  email: string,
-  context: LoginContext,
-): void {
-  const write = recordFailedLogin(email, context).finally(() => {
-    inFlight.delete(write);
+export function auditInBackground(write: Promise<void>): void {
+  const tracked = write.finally(() => {
+    inFlight.delete(tracked);
   });
-  inFlight.add(write);
+  inFlight.add(tracked);
 }
 
 /** Resolves once background audit writes have finished (tests, shutdown). */

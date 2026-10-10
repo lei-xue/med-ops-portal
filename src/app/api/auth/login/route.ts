@@ -3,11 +3,16 @@ import { z } from "zod";
 
 import { clientIp, payloadTooLarge, readJsonBody } from "@/lib/api";
 import {
-  recordFailedLoginInBackground,
+  auditInBackground,
+  recordFailedLogin,
   recordLogin,
   verifyCredentials,
 } from "@/lib/authService";
-import { loginPerAccount, loginPerAddress } from "@/lib/loginRateLimit";
+import {
+  loginPerAccount,
+  loginPerAddress,
+  loginPerEmail,
+} from "@/lib/loginRateLimit";
 import {
   isSecureRequest,
   mintSessionToken,
@@ -48,10 +53,12 @@ export async function POST(req: NextRequest) {
   if (!byAddress.ok) return tooManyAttempts(byAddress.retryAfter);
   const byAccount = loginPerAccount.hit(`${context.ip}|${email}`);
   if (!byAccount.ok) return tooManyAttempts(byAccount.retryAfter);
+  const byEmail = loginPerEmail.hit(email);
+  if (!byEmail.ok) return tooManyAttempts(byEmail.retryAfter);
 
   const user = await verifyCredentials(email, parsed.data.password);
   if (!user) {
-    recordFailedLoginInBackground(email, context);
+    auditInBackground(recordFailedLogin(email, context));
     return NextResponse.json(
       { error: "Invalid email or password." },
       { status: 401 },
@@ -69,6 +76,6 @@ export async function POST(req: NextRequest) {
     value: token,
   });
 
-  await recordLogin(user, context);
+  auditInBackground(recordLogin(user, context));
   return res;
 }

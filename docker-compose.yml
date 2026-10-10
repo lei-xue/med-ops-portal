@@ -1,7 +1,11 @@
+# Local development only. Names differ from docker-compose.prod.yml so the
+# two can never share a container or a data volume on one machine.
+name: medops-dev
+
 services:
   db:
     image: postgres:16-alpine
-    container_name: medops-db
+    container_name: medops-dev-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -9,7 +13,7 @@ services:
     ports:
       - "127.0.0.1:5433:5432"
     volumes:
-      - medops-pgdata:/var/lib/postgresql/data
+      - medops-dev-pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d medops"]
       interval: 5s
@@ -18,7 +22,7 @@ services:
 
   db-test:
     image: postgres:16-alpine
-    container_name: medops-db-test
+    container_name: medops-dev-db-test
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -32,4 +36,4 @@ services:
       retries: 10
 
 volumes:
-  medops-pgdata:
+  medops-dev-pgdata:

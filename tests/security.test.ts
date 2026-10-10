@@ -44,3 +44,11 @@ describe("RateLimiter", () => {
     expect(limiter.hit("a", 1_000)).toEqual({ ok: true });
   });
 });
+
+describe("RateLimiter key cap", () => {
+  it("never tracks more keys than its cap, even with no expired entries", () => {
+    const limiter = new RateLimiter(5, 60_000, 100);
+    for (let i = 0; i < 1_000; i += 1) limiter.hit(`ip-${i}`, 0);
+    expect(limiter.size).toBeLessThanOrEqual(100);
+  });
+});

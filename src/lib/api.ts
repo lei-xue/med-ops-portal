@@ -76,15 +76,18 @@ export function payloadTooLarge(): NextResponse {
 }
 
 /**
- * Best-effort client address for rate limiting and audit. In production the
- * app is only reachable through Caddy behind Cloudflare, so these headers are
- * set by trusted proxies; a directly exposed app could have them spoofed.
+ * Client address for rate limiting and audit.
+ *
+ * In production Caddy sets X-Real-IP from the socket address, trusting
+ * CF-Connecting-IP only from Cloudflare's ranges, and strips client-supplied
+ * copies (see Caddyfile). The app itself listens on loopback only. The other
+ * headers are fallbacks for local runs and tests without Caddy.
  */
 export function clientIp(req: Request): string {
   return (
+    req.headers.get("x-real-ip") ??
     req.headers.get("cf-connecting-ip") ??
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    req.headers.get("x-real-ip") ??
     "unknown"
   );
 }

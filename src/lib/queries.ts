@@ -255,7 +255,10 @@ export async function getRecentAudit(
 export interface AuditListFilters {
   action?: string;
   actorId?: number;
-  /** Drop `user.login` rows (ignored when filtering by a specific action). */
+  /**
+   * Drop successful `user.login` rows (ignored when filtering by a specific
+   * action). Failed sign-ins are security events and stay visible.
+   */
   excludeLogins?: boolean;
   page?: number;
   pageSize?: number;
