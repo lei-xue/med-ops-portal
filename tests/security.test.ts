@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { clientIp } from "@/lib/api";
 import { RateLimiter } from "@/lib/rateLimit";
 import { safeCallbackPath } from "@/lib/safeRedirect";
 
@@ -50,5 +51,25 @@ describe("RateLimiter key cap", () => {
     const limiter = new RateLimiter(5, 60_000, 100);
     for (let i = 0; i < 1_000; i += 1) limiter.hit(`ip-${i}`, 0);
     expect(limiter.size).toBeLessThanOrEqual(100);
+  });
+});
+
+describe("clientIp", () => {
+  it("prefers Cloudflare's CF-Connecting-IP over client-controlled headers", () => {
+    const req = new Request("http://localhost/", {
+      headers: {
+        "cf-connecting-ip": "203.0.113.10",
+        "x-real-ip": "6.6.6.6",
+        "x-forwarded-for": "7.7.7.7, 203.0.113.10",
+      },
+    });
+    expect(clientIp(req)).toBe("203.0.113.10");
+  });
+
+  it("falls back to forwarded headers only when Cloudflare's is absent", () => {
+    const req = new Request("http://localhost/", {
+      headers: { "x-forwarded-for": "198.51.100.1, 10.0.0.1" },
+    });
+    expect(clientIp(req)).toBe("198.51.100.1");
   });
 });

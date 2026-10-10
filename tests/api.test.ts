@@ -484,7 +484,7 @@ describe("login hardening", () => {
         req("/api/auth/login", {
           method: "POST",
           body: { email: user.email, password: "wrong-password" },
-          headers: { "x-real-ip": `198.51.100.${i}` },
+          headers: { "cf-connecting-ip": `198.51.100.${i}` },
         }),
       );
       statuses.push(res.status);
@@ -545,7 +545,7 @@ describe("GET /api/health", () => {
 describe("page proxy", () => {
   type Proxy = (r: NextRequest, ctx: unknown) => Promise<Response>;
   // Auth.js rebuilds the request URL from Host and X-Forwarded-Proto
-  // (defaulting to https). Browsers send Host and Caddy sets the protocol.
+  // (defaulting to https). Browsers send Host; Cloudflare sets the protocol.
   const page = (url: string, cookie?: string) =>
     req(url, {
       cookie,

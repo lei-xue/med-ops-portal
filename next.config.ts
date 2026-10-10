@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
 
-// Sent on every response, in dev and prod alike. HSTS is set by Caddy, since
-// it only makes sense on the HTTPS origin.
+// Sent on every response. Browsers ignore HSTS on plain-HTTP responses, so it
+// is harmless in local development and effective behind Cloudflare's HTTPS.
 const securityHeaders = [
+  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   // Refuse framing (clickjacking); frame-ancestors is the modern equivalent.
   { key: "X-Frame-Options", value: "DENY" },
