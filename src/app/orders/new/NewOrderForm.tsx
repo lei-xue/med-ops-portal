@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
+import { btnPrimary, btnSecondary, field, panel } from "@/components/ui";
 import { isLowStock } from "@/lib/permissions";
 
 interface MedicationOption {
@@ -73,14 +74,14 @@ export default function NewOrderForm({
   return (
     <form
       onSubmit={onSubmit}
-      className="space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+      className={`space-y-5 p-6 ${panel}`}
     >
       <div>
         <label
           htmlFor="patientName"
-          className="mb-1 block text-sm font-medium text-slate-700"
+          className="label-mono mb-1.5 block text-ink-2"
         >
-          Patient name <span className="text-rose-500">*</span>
+          Patient name <span className="text-signal-ink">*</span>
         </label>
         <input
           id="patientName"
@@ -89,7 +90,7 @@ export default function NewOrderForm({
           value={patientName}
           onChange={(e) => setPatientName(e.target.value)}
           placeholder="Fictional patient name"
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 focus:outline-none"
+          className={field}
         />
         <FieldError messages={fieldErrors.patientName} />
       </div>
@@ -97,15 +98,15 @@ export default function NewOrderForm({
       <div>
         <label
           htmlFor="medication"
-          className="mb-1 block text-sm font-medium text-slate-700"
+          className="label-mono mb-1.5 block text-ink-2"
         >
-          Medication <span className="text-rose-500">*</span>
+          Medication <span className="text-signal-ink">*</span>
         </label>
         <select
           id="medication"
           value={medicationId}
           onChange={(e) => setMedicationId(Number(e.target.value))}
-          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 focus:outline-none"
+          className={field}
         >
           {medications.map((med) => (
             <option key={med.id} value={med.id}>
@@ -114,11 +115,11 @@ export default function NewOrderForm({
           ))}
         </select>
         {selected && (
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1.5 text-xs text-ink-3">
             {selected.strength} · {selected.dosageForm} ·{" "}
             <span
               className={
-                isLowStock(selected) ? "font-semibold text-rose-600" : ""
+                isLowStock(selected) ? "font-semibold text-signal-ink" : ""
               }
             >
               {selected.stockQuantity} on hand
@@ -132,9 +133,9 @@ export default function NewOrderForm({
       <div>
         <label
           htmlFor="quantity"
-          className="mb-1 block text-sm font-medium text-slate-700"
+          className="label-mono mb-1.5 block text-ink-2"
         >
-          Quantity <span className="text-rose-500">*</span>
+          Quantity <span className="text-signal-ink">*</span>
         </label>
         <input
           id="quantity"
@@ -144,10 +145,10 @@ export default function NewOrderForm({
           max={1000}
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
-          className="w-32 rounded-md border border-slate-300 px-3 py-2 text-sm tabular-nums focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 focus:outline-none"
+          className={`${field} max-w-32 font-mono tabular-nums`}
         />
         {exceedsStock && (
-          <p className="mt-1 text-xs font-medium text-amber-600">
+          <p className="mt-1.5 text-xs font-medium text-signal-ink">
             Quantity exceeds current stock — the fill will be rejected unless
             inventory is adjusted first.
           </p>
@@ -158,7 +159,7 @@ export default function NewOrderForm({
       <div>
         <label
           htmlFor="notes"
-          className="mb-1 block text-sm font-medium text-slate-700"
+          className="label-mono mb-1.5 block text-ink-2"
         >
           Notes
         </label>
@@ -168,7 +169,7 @@ export default function NewOrderForm({
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Optional handling / context notes"
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 focus:outline-none"
+          className={field}
         />
         <FieldError messages={fieldErrors.notes} />
       </div>
@@ -176,24 +177,25 @@ export default function NewOrderForm({
       {error && (
         <p
           role="alert"
-          className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+          className="border-l-4 border-danger bg-sunken px-3 py-2 text-sm text-ink"
         >
           {error}
         </p>
       )}
 
-      <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+      <div className="perforation -mx-6 mb-0 h-px" />
+      <div className="flex justify-end gap-2">
         <button
           type="button"
           onClick={() => router.push("/orders")}
-          className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className={btnSecondary}
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={pending || medications.length === 0}
-          className="rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
+          className={btnPrimary}
         >
           {pending ? "Creating…" : "Create order"}
         </button>
@@ -205,7 +207,7 @@ export default function NewOrderForm({
 function FieldError({ messages }: { messages?: string[] }) {
   if (!messages?.length) return null;
   return (
-    <p className="mt-1 text-xs font-medium text-rose-600">
+    <p className="mt-1.5 text-xs font-medium text-danger">
       {messages.join(" ")}
     </p>
   );

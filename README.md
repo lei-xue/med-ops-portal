@@ -6,10 +6,21 @@ Live demo: https://medops.leixue.dev — logins `tech@demo.local`, `pharmacist@d
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
+<details><summary>More screenshots</summary>
+
+| | |
+| --- | --- |
+| ![Orders](docs/screenshots/orders.png) | ![Inventory](docs/screenshots/inventory.png) |
+| ![Audit log](docs/screenshots/audit-log.png) | ![Dark mode](docs/screenshots/dashboard-dark.png) |
+
+</details>
+
 - Orders move `pending → verified → filled → completed` (cancel only while pending/verified); illegal transitions are rejected server-side
 - Role checks (technician / pharmacist / admin) enforced in `src/lib/orderService.ts`
 - Every mutation writes an `audit_logs` row in the same transaction; filling decrements stock atomically
 - Read-only `/fhir` page pulling synthetic data from the public HAPI R4 sandbox
+
+UI: "Rx label" look — cool paper and ink, IBM Plex Mono for codes and counts, one signal orange reserved for work waiting on you and stock below its reorder line. Order stage is drawn as a 4-segment track, not a colour. Follows the system light/dark setting.
 
 Tech: Next.js 16 (App Router), React 19, TypeScript, Tailwind v4, PostgreSQL 16, Drizzle ORM, Auth.js v5, Vitest
 

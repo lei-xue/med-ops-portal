@@ -1,4 +1,17 @@
-import { and, asc, count, desc, eq, gte, ilike, lte, or, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  lte,
+  ne,
+  or,
+  type SQL,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { db } from "@/db";
@@ -7,6 +20,7 @@ import {
   medications,
   medicationOrders,
   users,
+  ORDER_STATUSES,
   type OrderStatus,
   type UserRole,
 } from "@/db/schema";
@@ -35,6 +49,8 @@ export interface OrderRow {
 export interface OrderListFilters {
   q?: string;
   status?: OrderStatus;
+  /** Match any of these statuses (ignored when `status` is set). */
+  statuses?: OrderStatus[];
   page?: number;
   pageSize?: number;
 }
@@ -51,6 +67,8 @@ function orderFiltersToWhere(filters: OrderListFilters): SQL | undefined {
   const conditions: SQL[] = [];
   if (filters.status) {
     conditions.push(eq(medicationOrders.status, filters.status));
+  } else if (filters.statuses?.length) {
+    conditions.push(inArray(medicationOrders.status, filters.statuses));
   }
   const q = filters.q?.trim();
   if (q) {
@@ -109,6 +127,20 @@ export async function listOrders(
   };
 }
 
+export async function countOrdersByStatus(): Promise<
+  Record<OrderStatus, number>
+> {
+  const rows = await db
+    .select({ status: medicationOrders.status, value: count() })
+    .from(medicationOrders)
+    .groupBy(medicationOrders.status);
+  const counts = Object.fromEntries(
+    ORDER_STATUSES.map((s) => [s, 0]),
+  ) as Record<OrderStatus, number>;
+  for (const row of rows) counts[row.status] = row.value;
+  return counts;
+}
+
 export async function getOrderDetail(id: number) {
   const [row] = await db
     .select({
@@ -141,6 +173,7 @@ export async function getOrderDetail(id: number) {
 export interface DashboardStats {
   pending: number;
   verifiedAwaitingFill: number;
+  filledAwaitingPickup: number;
   completedToday: number;
   lowStock: number;
 }
@@ -152,6 +185,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const [
     [pending],
     [verified],
+    [filled],
     [completedToday],
     [lowStock],
   ] = await Promise.all([
@@ -163,6 +197,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       .select({ value: count() })
       .from(medicationOrders)
       .where(eq(medicationOrders.status, "verified")),
+    db
+      .select({ value: count() })
+      .from(medicationOrders)
+      .where(eq(medicationOrders.status, "filled")),
     db
       .select({ value: count() })
       .from(medicationOrders)
@@ -183,6 +221,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   return {
     pending: pending?.value ?? 0,
     verifiedAwaitingFill: verified?.value ?? 0,
+    filledAwaitingPickup: filled?.value ?? 0,
     completedToday: completedToday?.value ?? 0,
     lowStock: lowStock?.value ?? 0,
   };
@@ -199,7 +238,10 @@ export interface AuditFeedRow {
   actorRole: UserRole;
 }
 
-export async function getRecentAudit(limit = 10): Promise<AuditFeedRow[]> {
+export async function getRecentAudit(
+  limit = 10,
+  { excludeLogins = false }: { excludeLogins?: boolean } = {},
+): Promise<AuditFeedRow[]> {
   return db
     .select({
       id: auditLogs.id,
@@ -213,6 +255,7 @@ export async function getRecentAudit(limit = 10): Promise<AuditFeedRow[]> {
     })
     .from(auditLogs)
     .innerJoin(users, eq(auditLogs.actorId, users.id))
+    .where(excludeLogins ? ne(auditLogs.action, "user.login") : undefined)
     .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
     .limit(limit);
 }
@@ -224,6 +267,8 @@ export async function getRecentAudit(limit = 10): Promise<AuditFeedRow[]> {
 export interface AuditListFilters {
   action?: string;
   actorId?: number;
+  /** Drop `user.login` rows (ignored when filtering by a specific action). */
+  excludeLogins?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -236,6 +281,9 @@ export async function listAuditLogs(
 
   const conditions: SQL[] = [];
   if (filters.action) conditions.push(eq(auditLogs.action, filters.action));
+  else if (filters.excludeLogins) {
+    conditions.push(ne(auditLogs.action, "user.login"));
+  }
   if (filters.actorId) conditions.push(eq(auditLogs.actorId, filters.actorId));
   const where = conditions.length ? and(...conditions) : undefined;
 

@@ -1,10 +1,90 @@
 @import "tailwindcss";
 
+/*
+ * "Rx label" design tokens. Cool paper + ink, one signal colour.
+ * Signal (orange) is reserved for "needs attention": work waiting on the
+ * current role and stock at/below the reorder line. Everything else is ink.
+ */
+:root {
+  --paper: #eceef1;
+  --card: #ffffff;
+  --sunken: #f5f6f8;
+  --ink: #0d1014;
+  --ink-2: #474f5c;
+  --ink-3: #848c99;
+  --rule: #d5d9df;
+  --rule-soft: #e6e9ed;
+  --signal: #ff4f00;
+  --signal-ink: #c23c00;
+  --signal-wash: #fff1ea;
+  --danger: #c8102e;
+  --on-ink: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0b0d10;
+    --card: #14171c;
+    --sunken: #101317;
+    --ink: #eef1f5;
+    --ink-2: #a9b1bd;
+    --ink-3: #6b7380;
+    --rule: #2a3039;
+    --rule-soft: #1e232a;
+    --signal: #ff6a26;
+    --signal-ink: #ff8a52;
+    --signal-wash: #2a160c;
+    --danger: #ff5a6e;
+    --on-ink: #0b0d10;
+  }
+}
+
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-grotesk);
+  --font-mono: var(--font-plex-mono);
+
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-rule-soft: var(--rule-soft);
+  --color-signal: var(--signal);
+  --color-signal-ink: var(--signal-ink);
+  --color-signal-wash: var(--signal-wash);
+  --color-danger: var(--danger);
+  --color-on-ink: var(--on-ink);
 }
 
 body {
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-grotesk), system-ui, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* Small uppercase mono caption used for column heads, stage numbers, meta. */
+@utility label-mono {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Dashed tear-off rule, like the perforation on a pharmacy label. */
+@utility perforation {
+  background-image: linear-gradient(to right, var(--rule) 50%, transparent 50%);
+  background-size: 8px 1px;
+  background-repeat: repeat-x;
+  background-position: bottom;
+}
+
+/* Focus ring shared by inputs and buttons. */
+@utility focus-ink {
+  &:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
 }

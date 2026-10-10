@@ -1,35 +1,63 @@
 import type { OrderStatus, UserRole } from "@/db/schema";
 import { ROLE_LABELS, STATUS_LABELS } from "@/lib/permissions";
 
-const STATUS_STYLES: Record<OrderStatus, string> = {
-  pending: "bg-amber-50 text-amber-700 ring-amber-600/20",
-  verified: "bg-sky-50 text-sky-700 ring-sky-600/20",
-  filled: "bg-violet-50 text-violet-700 ring-violet-600/20",
-  completed: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
-  cancelled: "bg-slate-100 text-slate-600 ring-slate-500/20",
+/** Position of each status along the happy path; cancelled sits off it. */
+const STAGE_INDEX: Record<OrderStatus, number> = {
+  pending: 1,
+  verified: 2,
+  filled: 3,
+  completed: 4,
+  cancelled: 0,
 };
 
-const ROLE_STYLES: Record<UserRole, string> = {
-  admin: "bg-teal-50 text-teal-700 ring-teal-600/20",
-  pharmacist: "bg-indigo-50 text-indigo-700 ring-indigo-600/20",
-  technician: "bg-slate-100 text-slate-700 ring-slate-500/20",
-};
-
-export function StatusBadge({ status }: { status: OrderStatus }) {
+/**
+ * Four-segment track showing how far an order has moved through
+ * pending → verified → filled → completed. Status is carried by shape and
+ * position, not by colour, so the palette stays free for "needs attention".
+ */
+export function StatusBadge({
+  status,
+  attention = false,
+}: {
+  status: OrderStatus;
+  attention?: boolean;
+}) {
+  const stage = STAGE_INDEX[status];
+  const cancelled = status === "cancelled";
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${STATUS_STYLES[status]}`}
-    >
-      {STATUS_LABELS[status]}
+    <span className="inline-flex items-center gap-2">
+      <span aria-hidden className="flex gap-0.5">
+        {[1, 2, 3, 4].map((n) => (
+          <span
+            key={n}
+            className={`h-2.5 w-2 ${
+              cancelled
+                ? "bg-rule-soft"
+                : n < stage
+                  ? "bg-ink"
+                  : n === stage
+                    ? attention
+                      ? "bg-signal"
+                      : "bg-ink"
+                    : "bg-rule"
+            }`}
+          />
+        ))}
+      </span>
+      <span
+        className={`label-mono ${
+          cancelled ? "text-ink-3 line-through" : "text-ink"
+        }`}
+      >
+        {STATUS_LABELS[status]}
+      </span>
     </span>
   );
 }
 
 export function RoleBadge({ role }: { role: UserRole }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${ROLE_STYLES[role]}`}
-    >
+    <span className="label-mono inline-flex items-center border border-rule px-1.5 py-px text-ink-2">
       {ROLE_LABELS[role]}
     </span>
   );
@@ -37,8 +65,8 @@ export function RoleBadge({ role }: { role: UserRole }) {
 
 export function LowStockBadge() {
   return (
-    <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 ring-1 ring-inset ring-rose-600/20">
-      Low stock
+    <span className="label-mono inline-flex items-center bg-signal px-1.5 py-px font-semibold text-black">
+      Reorder
     </span>
   );
 }

@@ -3,15 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { btnPrimarySm, btnQuiet } from "@/components/ui";
 import type { OrderStatus, UserRole } from "@/db/schema";
 import { ACTION_LABELS, legalActionsFor, type OrderAction } from "@/lib/permissions";
-
-const ACTION_STYLES: Partial<Record<OrderAction, string>> = {
-  verify: "bg-sky-600 hover:bg-sky-500 text-white",
-  fill: "bg-violet-600 hover:bg-violet-500 text-white",
-  complete: "bg-emerald-600 hover:bg-emerald-500 text-white",
-  cancel: "border border-slate-300 bg-white text-slate-600 hover:bg-slate-50",
-};
 
 export default function OrderRowActions({
   orderId,
@@ -26,10 +20,13 @@ export default function OrderRowActions({
   const [error, setError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<OrderAction | null>(null);
 
-  const actions = legalActionsFor(role, status);
+  // Cancel first so the forward action always sits at the right edge.
+  const actions = legalActionsFor(role, status).sort(
+    (a, b) => Number(b === "cancel") - Number(a === "cancel"),
+  );
 
   if (actions.length === 0 && !error) {
-    return <span className="text-xs text-slate-300">—</span>;
+    return <span className="text-xs text-ink-3">—</span>;
   }
 
   async function run(action: OrderAction) {
@@ -56,23 +53,28 @@ export default function OrderRowActions({
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <div className="flex justify-end gap-1.5">
+      <div className="flex items-center justify-end gap-2">
         {actions.map((action) => (
           <button
             key={action}
             type="button"
             disabled={pendingAction !== null}
             onClick={() => run(action)}
-            className={`rounded-md px-2.5 py-1 text-xs font-semibold disabled:opacity-50 ${ACTION_STYLES[action] ?? "border border-slate-300 bg-white text-slate-600"}`}
+            className={
+              action === "cancel"
+                ? btnQuiet
+                : btnPrimarySm
+            }
           >
-            {pendingAction === action
-              ? "…"
-              : ACTION_LABELS[action]}
+            {pendingAction === action ? "…" : ACTION_LABELS[action]}
+            {action !== "cancel" && pendingAction !== action && (
+              <span aria-hidden>→</span>
+            )}
           </button>
         ))}
       </div>
       {error && (
-        <p role="alert" className="max-w-48 text-right text-xs text-rose-600">
+        <p role="alert" className="max-w-48 text-right text-xs text-danger">
           {error}
         </p>
       )}

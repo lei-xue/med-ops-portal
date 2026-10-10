@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { btnQuiet } from "@/components/ui";
+
 export default function LogoutButton() {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -23,7 +25,7 @@ export default function LogoutButton() {
       type="button"
       onClick={logout}
       disabled={pending}
-      className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+      className={btnQuiet}
     >
       {pending ? "Signing out…" : "Sign out"}
     </button>

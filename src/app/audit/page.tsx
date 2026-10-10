@@ -4,8 +4,10 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { RoleBadge } from "@/components/badges";
+import { RelativeTime } from "@/components/RelativeTime";
+import { btnSecondary, fieldSm, panel, td, th } from "@/components/ui";
 import type { UserRole } from "@/db/schema";
-import { formatDateTime } from "@/lib/format";
+import { describeAudit } from "@/lib/audit";
 import { AUDIT_ACTIONS } from "@/lib/permissions";
 import { listActors, listAuditLogs } from "@/lib/queries";
 
@@ -15,6 +17,7 @@ interface AuditPageProps {
   searchParams: Promise<{
     action?: string;
     actor?: string;
+    logins?: string;
     page?: string;
   }>;
 }
@@ -29,10 +32,18 @@ export default async function AuditPage({ searchParams }: AuditPageProps) {
   const params = await searchParams;
   const action = AUDIT_ACTIONS.find((a) => a === params.action) ?? undefined;
   const actorId = Number.parseInt(params.actor ?? "", 10) || undefined;
+  // Sign-ins outnumber real changes; hide them unless asked for.
+  const includeLogins = params.logins === "1";
   const page = Number.parseInt(params.page ?? "1", 10) || 1;
 
   const [{ rows, total, pageCount }, actors] = await Promise.all([
-    listAuditLogs({ action, actorId, page, pageSize: 20 }),
+    listAuditLogs({
+      action,
+      actorId,
+      excludeLogins: !includeLogins,
+      page,
+      pageSize: 20,
+    }),
     listActors(),
   ]);
 
@@ -41,6 +52,7 @@ export default async function AuditPage({ searchParams }: AuditPageProps) {
     const merged = { action, actorId, ...overrides };
     if (merged.action) usp.set("action", merged.action);
     if (merged.actorId) usp.set("actor", String(merged.actorId));
+    if (includeLogins) usp.set("logins", "1");
     const p = overrides.page ?? (page > 1 ? String(page) : undefined);
     if (p && p !== "1") usp.set("page", p);
     const qs = usp.toString();
@@ -48,13 +60,15 @@ export default async function AuditPage({ searchParams }: AuditPageProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Audit log</h1>
-        <p className="text-sm text-slate-500">
-          {total} entr{total === 1 ? "y" : "ies"} — every mutation is recorded
-          in the same transaction that applied it.
+        <p className="label-mono text-ink-3">
+          {total} entr{total === 1 ? "y" : "ies"} · written in the same
+          transaction as the change
         </p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight">
+          Audit log
+        </h1>
       </div>
 
       <form
@@ -63,8 +77,9 @@ export default async function AuditPage({ searchParams }: AuditPageProps) {
       >
         <select
           name="action"
+          aria-label="Action"
           defaultValue={action ?? ""}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm focus:border-teal-500 focus:outline-none"
+          className={fieldSm}
         >
           <option value="">All actions</option>
           {AUDIT_ACTIONS.map((a) => (
@@ -75,8 +90,9 @@ export default async function AuditPage({ searchParams }: AuditPageProps) {
         </select>
         <select
           name="actor"
+          aria-label="Actor"
           defaultValue={actorId ? String(actorId) : ""}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm focus:border-teal-500 focus:outline-none"
+          className={fieldSm}
         >
           <option value="">All actors</option>
           {actors.map((actor) => (
@@ -85,58 +101,65 @@ export default async function AuditPage({ searchParams }: AuditPageProps) {
             </option>
           ))}
         </select>
-        <button
-          type="submit"
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
+        <label className="flex items-center gap-2 px-1 text-sm text-ink-2">
+          <input
+            type="checkbox"
+            name="logins"
+            value="1"
+            defaultChecked={includeLogins}
+            className="size-4 accent-current"
+          />
+          Include sign-ins
+        </label>
+        <button type="submit" className={btnSecondary}>
           Apply filters
         </button>
       </form>
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className={`overflow-x-auto ${panel}`}>
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs tracking-wide text-slate-500 uppercase">
+          <thead className="border-b border-rule bg-sunken">
             <tr>
-              <th className="px-4 py-2.5 font-medium">Time</th>
-              <th className="px-4 py-2.5 font-medium">Actor</th>
-              <th className="px-4 py-2.5 font-medium">Action</th>
-              <th className="px-4 py-2.5 font-medium">Entity</th>
-              <th className="px-4 py-2.5 font-medium">Details</th>
+              <th className={th}>When</th>
+              <th className={th}>Actor</th>
+              <th className={th}>Action</th>
+              <th className={th}>What happened</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-rule-soft">
             {rows.map((row) => (
-              <tr key={row.id} className="hover:bg-slate-50/60">
-                <td className="px-4 py-2.5 text-xs whitespace-nowrap text-slate-500 tabular-nums">
-                  {formatDateTime(row.createdAt)}
+              <tr key={row.id} className="align-top hover:bg-sunken">
+                <td className={`${td} text-ink-2`}>
+                  <RelativeTime value={row.createdAt} />
                 </td>
-                <td className="px-4 py-2.5">
-                  <span className="font-medium text-slate-800">
-                    {row.actorName}
-                  </span>{" "}
+                <td className={`${td} whitespace-nowrap`}>
+                  <span className="font-medium">{row.actorName}</span>{" "}
                   <RoleBadge role={row.actorRole as UserRole} />
                 </td>
-                <td className="px-4 py-2.5">
-                  <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">
+                <td className={td}>
+                  <code className="font-mono text-xs text-ink">
                     {row.action}
                   </code>
+                  <span className="block font-mono text-xs text-ink-3">
+                    {row.entityType} #{row.entityId}
+                  </span>
                 </td>
-                <td className="px-4 py-2.5 text-xs text-slate-600">
-                  {row.entityType} #{row.entityId}
-                </td>
-                <td className="max-w-md px-4 py-2.5">
-                  <code
-                    title={JSON.stringify(row.details) ?? undefined}
-                    className="block truncate font-mono text-xs text-slate-500"
-                  >
-                    {row.details ? JSON.stringify(row.details) : "—"}
-                  </code>
+                <td className={`${td} max-w-md`}>
+                  <span className="text-ink-2">{describeAudit(row)}</span>
+                  {row.details != null && (
+                    <code
+                      title={JSON.stringify(row.details)}
+                      className="mt-0.5 block truncate font-mono text-xs text-ink-3"
+                    >
+                      {JSON.stringify(row.details)}
+                    </code>
+                  )}
                 </td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={4} className="px-4 py-12 text-center text-ink-2">
                   No audit entries match the current filters.
                 </td>
               </tr>
@@ -147,24 +170,24 @@ export default async function AuditPage({ searchParams }: AuditPageProps) {
 
       {pageCount > 1 && (
         <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-500">
-            Page {page} of {pageCount}
+          <span className="label-mono text-ink-3">
+            Page {page} / {pageCount}
           </span>
           <div className="flex gap-2">
             {page > 1 && (
               <Link
                 href={buildHref({ page: String(page - 1) })}
-                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
+                className={btnSecondary}
               >
-                Previous
+                ← Previous
               </Link>
             )}
             {page < pageCount && (
               <Link
                 href={buildHref({ page: String(page + 1) })}
-                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
+                className={btnSecondary}
               >
-                Next
+                Next →
               </Link>
             )}
           </div>

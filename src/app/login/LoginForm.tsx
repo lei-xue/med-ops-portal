@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 
+import { btnPrimary, field } from "@/components/ui";
+
 const DEMO_ACCOUNTS = [
   { label: "Admin", email: "admin@demo.local" },
   { label: "Pharmacist", email: "pharmacist@demo.local" },
@@ -49,7 +51,7 @@ export default function LoginForm() {
       <div>
         <label
           htmlFor="email"
-          className="mb-1 block text-sm font-medium text-slate-700"
+          className="label-mono mb-1.5 block text-ink-2"
         >
           Email
         </label>
@@ -60,14 +62,14 @@ export default function LoginForm() {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 focus:outline-none"
+          className={field}
           placeholder="you@demo.local"
         />
       </div>
       <div>
         <label
           htmlFor="password"
-          className="mb-1 block text-sm font-medium text-slate-700"
+          className="label-mono mb-1.5 block text-ink-2"
         >
           Password
         </label>
@@ -78,7 +80,7 @@ export default function LoginForm() {
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 focus:outline-none"
+          className={field}
           placeholder="••••••••"
         />
       </div>
@@ -86,7 +88,7 @@ export default function LoginForm() {
       {error && (
         <p
           role="alert"
-          className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+          className="border-l-4 border-danger bg-sunken px-3 py-2 text-sm text-ink"
         >
           {error}
         </p>
@@ -95,30 +97,38 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-md bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
+        className={`${btnPrimary} w-full py-2.5`}
       >
         {pending ? "Signing in…" : "Sign in"}
       </button>
 
-      <div className="border-t border-slate-100 pt-3">
-        <p className="mb-2 text-xs text-slate-500">
-          Demo accounts (password <code className="font-mono">{DEMO_PASSWORD}</code>):
+      <div className="perforation pt-1" />
+      <div>
+        <p className="label-mono mb-2 text-ink-3">
+          Demo accounts · password{" "}
+          <code className="normal-case">{DEMO_PASSWORD}</code>
         </p>
-        <div className="flex flex-wrap gap-2">
+        <ul className="divide-y divide-rule-soft border border-rule">
           {DEMO_ACCOUNTS.map((account) => (
-            <button
-              key={account.email}
-              type="button"
-              onClick={() => {
-                setEmail(account.email);
-                setPassword(DEMO_PASSWORD);
-              }}
-              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600 hover:border-teal-300 hover:bg-teal-50 hover:text-teal-700"
-            >
-              {account.label}
-            </button>
+            <li key={account.email}>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail(account.email);
+                  setPassword(DEMO_PASSWORD);
+                }}
+                className={`focus-ink flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-sunken ${
+                  email === account.email ? "bg-sunken" : ""
+                }`}
+              >
+                <span className="font-medium">{account.label}</span>
+                <span className="font-mono text-xs text-ink-3">
+                  {account.email}
+                </span>
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </form>
   );

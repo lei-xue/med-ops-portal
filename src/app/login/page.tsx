@@ -2,35 +2,56 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { RxMark } from "@/components/Header";
+import { panel } from "@/components/ui";
 import LoginForm from "./LoginForm";
 
 export const metadata: Metadata = { title: "Sign in" };
+
+const STAGES = ["Pending", "Verified", "Filled", "Completed"];
 
 export default async function LoginPage() {
   const session = await auth();
   if (session) redirect("/");
 
   return (
-    <div className="mx-auto mt-8 w-full max-w-sm space-y-4">
-      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-6 text-center">
-          <span className="mx-auto grid size-10 place-items-center rounded-lg bg-teal-600 text-lg font-bold text-white">
-            Rx
-          </span>
-          <h1 className="mt-3 text-lg font-semibold text-slate-900">
-            Sign in to MedOps Portal
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Medication operations for the pharmacy team
-          </p>
+    <div className={`mx-auto mt-4 grid max-w-4xl md:grid-cols-2 ${panel}`}>
+      {/* Brand side, laid out like a dispensing label. */}
+      <div className="flex flex-col justify-between gap-10 border-b border-rule bg-ink p-8 text-on-ink md:border-r md:border-b-0">
+        <div className="flex items-center gap-3">
+          <RxMark size="lg" />
+          <div>
+            <div className="text-lg font-semibold tracking-tight">MedOps</div>
+            <div className="label-mono opacity-60">Medication operations</div>
+          </div>
         </div>
-        <LoginForm />
+        <div>
+          <h1 className="text-3xl leading-tight font-semibold tracking-tight">
+            Every order, verified before it leaves the bench.
+          </h1>
+          <ol className="mt-8 grid grid-cols-4 gap-1">
+            {STAGES.map((stage, i) => (
+              <li key={stage}>
+                <div className={`h-1.5 ${i === 3 ? "bg-signal" : "bg-current opacity-80"}`} />
+                <div className="label-mono mt-2 opacity-60">
+                  0{i + 1} {stage}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+        <p className="label-mono opacity-50">
+          Demo system · all data fictional
+        </p>
       </div>
 
-      <p className="text-center text-xs text-slate-400">
-        Demo system — all data fictional. Accounts below are seeded demo
-        users.
-      </p>
+      <div className="p-8">
+        <p className="label-mono text-ink-3">Staff sign-in</p>
+        <h2 className="mt-1 mb-6 text-2xl font-semibold tracking-tight">
+          Welcome back
+        </h2>
+        <LoginForm />
+      </div>
     </div>
   );
 }

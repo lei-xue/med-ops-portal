@@ -126,3 +126,13 @@ export const ACTION_LABELS: Record<OrderAction, string> = {
   cancel: "Cancel",
   "inventory.adjust": "Adjust stock",
 };
+
+/**
+ * Statuses where the role can move an order forward (cancel doesn't count).
+ * These are the orders that show up as "waiting on you".
+ */
+export function attentionStatusesFor(role: UserRole): OrderStatus[] {
+  return (Object.keys(LEGAL_TRANSITIONS) as OrderStatus[]).filter((status) =>
+    legalActionsFor(role, status).some((action) => action !== "cancel"),
+  );
+}

@@ -10,29 +10,25 @@ import {
   type FhirPatient,
   type FhirResult,
 } from "@/lib/fhir";
-import { formatDateTime } from "@/lib/format";
+import { RelativeTime } from "@/components/RelativeTime";
+import { btnSecondary, panel, td, th } from "@/components/ui";
 
 export const metadata: Metadata = { title: "FHIR feed" };
 
 // Must match the fetch-level revalidation in src/lib/fhir.ts.
 export const revalidate = 300;
 
-const MEDICATION_STATUS_STYLES: Record<string, string> = {
-  active: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
-  "on-hold": "bg-amber-50 text-amber-700 ring-amber-600/20",
-  completed: "bg-sky-50 text-sky-700 ring-sky-600/20",
-  stopped: "bg-violet-50 text-violet-700 ring-violet-600/20",
-  cancelled: "bg-rose-50 text-rose-700 ring-rose-600/20",
-  "entered-in-error": "bg-rose-50 text-rose-700 ring-rose-600/20",
-};
-
 function FhirStatusBadge({ status }: { status: string }) {
-  const style =
-    MEDICATION_STATUS_STYLES[status] ??
-    "bg-slate-100 text-slate-600 ring-slate-500/20";
+  const inactive = ["cancelled", "stopped", "entered-in-error"].includes(
+    status,
+  );
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${style}`}
+      className={`label-mono inline-flex items-center border px-1.5 py-px ${
+        inactive
+          ? "border-dashed border-rule text-ink-3"
+          : "border-rule text-ink"
+      }`}
     >
       {status}
     </span>
@@ -49,12 +45,10 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-4 py-3">
-        <h2 className="text-sm font-semibold text-slate-900">
-          {title}{" "}
-          <span className="font-normal text-slate-400">({count})</span>
-        </h2>
+    <section className={`overflow-hidden ${panel}`}>
+      <div className="flex items-baseline justify-between border-b border-rule px-4 py-3">
+        <h2 className="label-mono font-semibold">{title}</h2>
+        <span className="font-mono text-xs text-ink-3">{count} resources</span>
       </div>
       {children}
     </section>
@@ -63,15 +57,10 @@ function SectionCard({
 
 function FhirErrorCard({ message }: { message: string }) {
   return (
-    <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-6 text-center">
-      <p className="font-medium text-rose-800">
-        The FHIR sandbox could not be reached
-      </p>
-      <p className="mt-1 text-sm text-rose-700">{message}</p>
-      <Link
-        href="/fhir"
-        className="mt-3 inline-block rounded-md border border-rose-300 bg-white px-3 py-1.5 text-sm font-medium text-rose-700 hover:bg-rose-100"
-      >
+    <div className={`${panel} border-l-4 border-l-danger px-5 py-6`}>
+      <p className="font-medium">The FHIR sandbox could not be reached</p>
+      <p className="mt-1 text-sm text-ink-2">{message}</p>
+      <Link href="/fhir" className={`${btnSecondary} mt-4`}>
         Retry
       </Link>
     </div>
@@ -81,7 +70,7 @@ function FhirErrorCard({ message }: { message: string }) {
 function EmptyRow({ colSpan, label }: { colSpan: number; label: string }) {
   return (
     <tr>
-      <td colSpan={colSpan} className="px-4 py-8 text-center text-slate-500">
+      <td colSpan={colSpan} className="px-4 py-12 text-center text-ink-2">
         {label}
       </td>
     </tr>
@@ -94,28 +83,28 @@ function patientsTable(result: FhirResult<FhirPatient[]>) {
     <SectionCard title="Patients" count={result.data.length}>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs tracking-wide text-slate-500 uppercase">
+          <thead className="border-b border-rule bg-sunken">
             <tr>
-              <th className="px-4 py-2.5 font-medium">Name</th>
-              <th className="px-4 py-2.5 font-medium">Gender</th>
-              <th className="px-4 py-2.5 font-medium">Birth date</th>
-              <th className="px-4 py-2.5 font-medium">FHIR ID</th>
+              <th className={th}>Name</th>
+              <th className={th}>Gender</th>
+              <th className={th}>Birth date</th>
+              <th className={th}>FHIR ID</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-rule-soft">
             {result.data.map((patient, index) => (
-              <tr key={patient.id ?? index} className="hover:bg-slate-50/60">
-                <td className="px-4 py-2.5 font-medium text-slate-800">
+              <tr key={patient.id ?? index} className="hover:bg-sunken">
+                <td className={`${td} font-medium`}>
                   {patient.name ?? "—"}
                 </td>
-                <td className="px-4 py-2.5 text-slate-600">
+                <td className={`${td} text-ink-2`}>
                   {patient.gender ?? "—"}
                 </td>
-                <td className="px-4 py-2.5 text-slate-600 tabular-nums">
+                <td className={`${td} font-mono text-xs text-ink-2 tabular-nums`}>
                   {patient.birthDate ?? "—"}
                 </td>
-                <td className="px-4 py-2.5">
-                  <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-600">
+                <td className={td}>
+                  <code className="font-mono text-xs text-ink-2">
                     {patient.id ?? "—"}
                   </code>
                 </td>
@@ -139,40 +128,42 @@ function medicationRequestsTable(
     <SectionCard title="MedicationRequests" count={result.data.length}>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs tracking-wide text-slate-500 uppercase">
+          <thead className="border-b border-rule bg-sunken">
             <tr>
-              <th className="px-4 py-2.5 font-medium">Medication</th>
-              <th className="px-4 py-2.5 font-medium">Status</th>
-              <th className="px-4 py-2.5 font-medium">Intent</th>
-              <th className="px-4 py-2.5 font-medium">Patient</th>
-              <th className="px-4 py-2.5 font-medium">Authored</th>
+              <th className={th}>Medication</th>
+              <th className={th}>Status</th>
+              <th className={th}>Intent</th>
+              <th className={th}>Patient</th>
+              <th className={th}>Authored</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-rule-soft">
             {result.data.map((request, index) => (
-              <tr key={request.id ?? index} className="hover:bg-slate-50/60">
-                <td className="px-4 py-2.5 font-medium text-slate-800">
+              <tr key={request.id ?? index} className="hover:bg-sunken">
+                <td className={`${td} font-medium`}>
                   {request.medication ?? "—"}
                 </td>
-                <td className="px-4 py-2.5">
+                <td className={td}>
                   {request.status ? (
                     <FhirStatusBadge status={request.status} />
                   ) : (
                     "—"
                   )}
                 </td>
-                <td className="px-4 py-2.5 text-slate-600">
+                <td className={`${td} text-ink-2`}>
                   {request.intent ?? "—"}
                 </td>
-                <td className="px-4 py-2.5">
-                  <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-600">
+                <td className={td}>
+                  <code className="font-mono text-xs text-ink-2">
                     {request.patientReference ?? "—"}
                   </code>
                 </td>
-                <td className="px-4 py-2.5 text-xs whitespace-nowrap text-slate-500 tabular-nums">
-                  {request.authoredOn
-                    ? formatDateTime(request.authoredOn)
-                    : "—"}
+                <td className={`${td} text-ink-2`}>
+                  {request.authoredOn ? (
+                    <RelativeTime value={request.authoredOn} />
+                  ) : (
+                    "—"
+                  )}
                 </td>
               </tr>
             ))}
@@ -203,10 +194,15 @@ export default async function FhirPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">FHIR feed</h1>
-        <p className="mt-0.5 text-sm text-slate-500">
-          Live read-only feed from the public HAPI FHIR R4 test server
-          (synthetic data). Fetched server-side and cached for 5 minutes.
+        <p className="label-mono text-ink-3">
+          HAPI FHIR R4 · read-only · cached 5 min
+        </p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight">
+          FHIR feed
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm text-ink-2">
+          Live synthetic data from the public HAPI FHIR R4 test server, fetched
+          server-side.
         </p>
       </div>
 

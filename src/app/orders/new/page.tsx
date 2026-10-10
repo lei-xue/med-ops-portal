@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { panel } from "@/components/ui";
 import { roleCan } from "@/lib/permissions";
 import { listMedications } from "@/lib/queries";
 import NewOrderForm from "./NewOrderForm";
@@ -15,14 +16,14 @@ export default async function NewOrderPage() {
 
   if (!roleCan(session.user.role, "create")) {
     return (
-      <div className="mx-auto mt-10 max-w-md rounded-lg border border-rose-200 bg-rose-50 p-6 text-center">
-        <h1 className="font-semibold text-rose-800">Not permitted</h1>
-        <p className="mt-1 text-sm text-rose-700">
+      <div className={`mx-auto mt-10 max-w-md border-l-4 border-l-danger p-6 ${panel}`}>
+        <h1 className="font-semibold">Not permitted</h1>
+        <p className="mt-1 text-sm text-ink-2">
           Your role cannot create orders.
         </p>
         <Link
           href="/orders"
-          className="mt-4 inline-block text-sm font-medium text-teal-700 hover:text-teal-600"
+          className="label-mono mt-4 inline-block text-ink-2 hover:text-ink"
         >
           ← Back to orders
         </Link>
@@ -33,20 +34,17 @@ export default async function NewOrderPage() {
   const medications = await listMedications();
 
   return (
-    <div className="mx-auto max-w-xl space-y-4">
+    <div className="mx-auto max-w-xl space-y-6">
       <div>
-        <Link
-          href="/orders"
-          className="text-xs font-medium text-teal-700 hover:text-teal-600"
-        >
+        <Link href="/orders" className="label-mono text-ink-3 hover:text-ink">
           ← Back to orders
         </Link>
-        <h1 className="mt-1 text-xl font-semibold text-slate-900">
-          New medication order
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+          New order
         </h1>
-        <p className="text-sm text-slate-500">
-          Orders start as <strong>pending</strong> and require pharmacist
-          verification before filling.
+        <p className="mt-2 text-sm text-ink-2">
+          Orders start as <strong className="text-ink">pending</strong> and
+          need pharmacist verification before they can be filled.
         </p>
       </div>
 
