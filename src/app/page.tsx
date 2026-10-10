@@ -11,15 +11,16 @@ import {
 import Link from "next/link";
 
 import { Avatar } from "@/components/Avatar";
-import { STATUS_STYLES, StatusBadge } from "@/components/badges";
+import { ProductBadges, STATUS_STYLES, StatusBadge } from "@/components/badges";
 import { AUDIT_FALLBACK, AUDIT_ICONS, STATUS_ICONS } from "@/components/icons";
+import { orderCode } from "@/components/OrdersTable";
 import { PageHeader } from "@/components/PageHeader";
 import { RelativeTime } from "@/components/RelativeTime";
 import { StockGauge } from "@/components/StockGauge";
-import { btnPrimary, card, cardHeader, td, th } from "@/components/ui";
+import { btnPrimary, card, cardHeader, recordLink, td, th } from "@/components/ui";
 import type { OrderStatus, UserRole } from "@/db/schema";
 import { describeAudit } from "@/lib/audit";
-import { formatLongDate } from "@/lib/format";
+import { formatLongDate, formatQuantity } from "@/lib/format";
 import {
   attentionStatusesFor,
   isLowStock,
@@ -227,14 +228,17 @@ export default async function DashboardPage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-2">
-                        <span className="truncate text-sm font-medium">
+                        <Link
+                          href={`/medications/${med.id}`}
+                          className={`${recordLink} truncate text-sm`}
+                        >
                           {med.name}
-                        </span>
+                        </Link>
                         <span className="text-xs whitespace-nowrap text-slate-500 tabular-nums">
                           <span className="font-semibold text-red-700">
                             {med.stockQuantity}
                           </span>{" "}
-                          / {med.reorderThreshold}
+                          / {med.reorderThreshold} {med.stockUnit}
                         </span>
                       </div>
                       <div className="mb-2 text-xs text-slate-500">
@@ -291,20 +295,39 @@ export default async function DashboardPage() {
                         <div className="flex items-center gap-3">
                           <Avatar name={order.patientName} />
                           <div className="min-w-0">
-                            <div className="truncate font-medium">
+                            <Link
+                              href={`/patients/${order.patientId}`}
+                              className={`${recordLink} truncate`}
+                            >
                               {order.patientName}
-                            </div>
-                            <div className="font-mono text-xs text-slate-500">
-                              ORD-{String(order.id).padStart(5, "0")}
-                            </div>
+                            </Link>
+                            <Link
+                              href={`/orders/${order.id}`}
+                              className="block font-mono text-xs text-brand-700 hover:underline"
+                            >
+                              {orderCode(order.id)}
+                            </Link>
                           </div>
                         </div>
                       </td>
                       <td className={td}>
-                        <div>{order.medicationName}</div>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/medications/${order.medicationId}`}
+                            className={recordLink}
+                          >
+                            {order.medicationName} {order.medicationStrength}
+                          </Link>
+                          <ProductBadges
+                            rxStatus={order.medicationRxStatus}
+                            schedule={order.medicationSchedule}
+                          />
+                        </div>
                         <div className="text-xs text-slate-500">
-                          {order.medicationStrength} · qty{" "}
-                          <span className="tabular-nums">{order.quantity}</span>
+                          {formatQuantity(order.quantity, order.stockUnit)}
+                          {order.prescriberName
+                            ? ` · ${order.prescriberName}, ${order.prescriberCredentials}`
+                            : " · OTC"}
                         </div>
                       </td>
                       <td className={td}>

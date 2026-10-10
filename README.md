@@ -1,6 +1,6 @@
 # MedOps Portal
 
-Demo internal workflow system for a pharmacy/clinic team: medication order lifecycle, inventory control and a full audit trail. All data is fictional (no PHI).
+Demo internal workflow system for a pharmacy/clinic team: prescriptions linked to patients and prescribers, a product catalog with strengths, dosage forms and Rx/OTC/controlled status, inventory control and a full audit trail. All data is fictional (no PHI).
 
 Live demo: https://medops.leixue.dev — logins `tech@demo.local`, `pharmacist@demo.local`, `admin@demo.local`, password `demo1234!`
 
@@ -10,12 +10,16 @@ Live demo: https://medops.leixue.dev — logins `tech@demo.local`, `pharmacist@d
 
 | | |
 | --- | --- |
-| ![Orders](docs/screenshots/orders.png) | ![Inventory](docs/screenshots/inventory.png) |
-| ![Audit log](docs/screenshots/audit-log.png) | ![New order](docs/screenshots/new-order.png) |
+| ![Orders](docs/screenshots/orders.png) | ![Order detail](docs/screenshots/order-detail.png) |
+| ![Inventory](docs/screenshots/inventory.png) | ![Patient](docs/screenshots/patient.png) |
+| ![New order](docs/screenshots/new-order.png) | ![Audit log](docs/screenshots/audit-log.png) |
 | ![Sign in](docs/screenshots/login.png) | ![FHIR feed](docs/screenshots/fhir-feed.png) |
 
 </details>
 
+- Every order links to a patient record (MRN, date of birth, allergies), a prescriber (NPI, specialty) and one product; each has its own page listing its orders
+- Catalog of 42 products across 27 drugs: one product per strength and dosage form (e.g. amoxicillin 250 mg capsule, 875 mg tablet, 400 mg/5 mL suspension), counted in its own unit (tablets, mL, inhalers, pens…)
+- Prescription rules enforced server-side: Rx-only products need a prescriber, OTC products don't; Schedule II controlled substances can't be refilled, Schedule III–V allow at most 5 refills
 - Orders move `pending → verified → filled → completed` (cancel only while pending/verified); illegal transitions are rejected server-side
 - Role checks (technician / pharmacist / admin) enforced in `src/lib/orderService.ts`
 - Every mutation writes an `audit_logs` row in the same transaction; filling locks the order and stock rows, and race tests prove two simultaneous fills can't oversell

@@ -19,6 +19,7 @@ import {
   closeDb,
   resetDatabase,
   seedMedication,
+  seedParties,
   seedUser,
   TEST_PASSWORD,
 } from "./helpers";
@@ -148,7 +149,7 @@ describe("order lifecycle through the API", () => {
     const res = await createOrderPOST(
       req("/api/orders", {
         method: "POST",
-        body: { patientName: "X", medicationId: 1, quantity: 1 },
+        body: { patientId: 1, prescriberId: 1, medicationId: 1, quantity: 1 },
       }),
     );
     expect(res.status).toBe(401);
@@ -168,7 +169,7 @@ describe("order lifecycle through the API", () => {
         method: "POST",
         cookie: techCookie,
         body: {
-          patientName: "End To End",
+          ...(await seedParties("End To End")),
           medicationId: med.id,
           quantity: 4,
           notes: "integration test",
@@ -251,7 +252,7 @@ describe("API role enforcement", () => {
       req("/api/orders", {
         method: "POST",
         cookie: techCookie,
-        body: { patientName: "Forbidden Fred", medicationId: med.id, quantity: 1 },
+        body: { ...(await seedParties("Forbidden Fred")), medicationId: med.id, quantity: 1 },
       }),
     );
     const { order } = await created.json();
@@ -311,7 +312,7 @@ describe("API role enforcement", () => {
       req("/api/orders", {
         method: "POST",
         cookie: techCookie,
-        body: { patientName: "Duplicate Dan", medicationId: med.id, quantity: 2 },
+        body: { ...(await seedParties("Duplicate Dan")), medicationId: med.id, quantity: 2 },
       }),
     );
     const { order } = await created.json();
@@ -341,7 +342,7 @@ describe("API role enforcement", () => {
       req("/api/orders", {
         method: "POST",
         cookie: techCookie,
-        body: { patientName: "Overeager Oliver", medicationId: med.id, quantity: 10 },
+        body: { ...(await seedParties("Overeager Oliver")), medicationId: med.id, quantity: 10 },
       }),
     );
     const { order } = await created.json();
@@ -377,6 +378,49 @@ describe("API role enforcement", () => {
       { params: Promise.resolve({ id: "99999" }) },
     );
     expect(res.status).toBe(404);
+  });
+});
+
+describe("prescription rules through the API", () => {
+  it("returns a field error when an Rx product has no prescriber", async () => {
+    const tech = await seedUser("technician");
+    const med = await seedMedication(20, 5, { rxStatus: "rx" });
+    const { patientId } = await seedParties("No Prescriber");
+    const cookie = await login(tech.email);
+
+    const res = await createOrderPOST(
+      req("/api/orders", {
+        method: "POST",
+        cookie,
+        body: { patientId, medicationId: med.id, quantity: 1 },
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.fieldErrors?.prescriberId?.[0]).toMatch(/prescription-only/);
+  });
+
+  it("order detail links the patient and prescriber", async () => {
+    const tech = await seedUser("technician");
+    const med = await seedMedication(20, 5);
+    const parties = await seedParties("Linked Lou");
+    const cookie = await login(tech.email);
+
+    const created = await createOrderPOST(
+      req("/api/orders", {
+        method: "POST",
+        cookie,
+        body: { ...parties, medicationId: med.id, quantity: 2, refills: 1, daysSupply: 30 },
+      }),
+    );
+    const { order } = await created.json();
+    const detail = await getOrderGET(req(`/api/orders/${order.id}`, { cookie }), {
+      params: Promise.resolve({ id: String(order.id) }),
+    });
+    const body = await detail.json();
+    expect(body.order.patient).toMatchObject({ id: parties.patientId, name: "Linked Lou" });
+    expect(body.order.prescriberId).toBe(parties.prescriberId);
+    expect(body.order).toMatchObject({ refills: 1, daysSupply: 30 });
   });
 });
 

@@ -31,7 +31,11 @@ export async function getApiSession(
 export function handleServiceError(err: unknown): NextResponse {
   if (err instanceof OrderServiceError) {
     return NextResponse.json(
-      { error: err.message, code: err.code },
+      {
+        error: err.message,
+        code: err.code,
+        ...(err.field ? { fieldErrors: { [err.field]: [err.message] } } : {}),
+      },
       { status: SERVICE_STATUS[err.code] ?? 400 },
     );
   }

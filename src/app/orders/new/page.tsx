@@ -5,12 +5,14 @@ import { PageHeader } from "@/components/PageHeader";
 import { card } from "@/components/ui";
 import { requirePageSession } from "@/lib/pageSession";
 import { roleCan } from "@/lib/permissions";
-import { listMedications } from "@/lib/queries";
+import { listMedications, listPatients, listPrescribers } from "@/lib/queries";
 import NewOrderForm from "./NewOrderForm";
 
 export const metadata: Metadata = { title: "New order" };
 
-export default async function NewOrderPage() {
+export default async function NewOrderPage({
+  searchParams,
+}: PageProps<"/orders/new">) {
   const session = await requirePageSession();
 
   if (!roleCan(session.user.role, "create")) {
@@ -30,7 +32,12 @@ export default async function NewOrderPage() {
     );
   }
 
-  const medications = await listMedications();
+  const params = await searchParams;
+  const [medications, patients, prescribers] = await Promise.all([
+    listMedications(),
+    listPatients(),
+    listPrescribers(),
+  ]);
 
   return (
     <>
@@ -41,14 +48,33 @@ export default async function NewOrderPage() {
           </Link>
         }
         title="New medication order"
-        description="Orders start as pending and need pharmacist verification before they can be filled."
+        description="Orders start as pending and need pharmacist verification before they can be filled. Prescription-only products need a prescriber."
       />
       <NewOrderForm
+        initialPatientId={Number(params.patient) || null}
+        initialMedicationId={Number(params.medication) || null}
+        patients={patients.map((p) => ({
+          id: p.id,
+          name: p.name,
+          mrn: p.mrn,
+          dateOfBirth: p.dateOfBirth,
+          allergies: p.allergies,
+        }))}
+        prescribers={prescribers.map((p) => ({
+          id: p.id,
+          name: p.name,
+          credentials: p.credentials,
+          specialty: p.specialty,
+        }))}
         medications={medications.map((m) => ({
           id: m.id,
           name: m.name,
+          brandName: m.brandName,
           strength: m.strength,
           dosageForm: m.dosageForm,
+          rxStatus: m.rxStatus,
+          deaSchedule: m.deaSchedule,
+          stockUnit: m.stockUnit,
           stockQuantity: m.stockQuantity,
           reorderThreshold: m.reorderThreshold,
         }))}

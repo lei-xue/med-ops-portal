@@ -1,6 +1,6 @@
 import { TriangleAlert } from "lucide-react";
 
-import type { OrderStatus, UserRole } from "@/db/schema";
+import type { DeaSchedule, OrderStatus, RxStatus, UserRole } from "@/db/schema";
 import { ROLE_LABELS, STATUS_LABELS } from "@/lib/permissions";
 
 export const STATUS_STYLES: Record<
@@ -56,6 +56,43 @@ export function StockBadge({ low }: { low: boolean }) {
     <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200 ring-inset">
       <span aria-hidden className="size-1.5 rounded-full bg-emerald-500" />
       In stock
+    </span>
+  );
+}
+
+/** Rx-only vs OTC, plus the DEA schedule for controlled substances. */
+export function ProductBadges({
+  rxStatus,
+  schedule,
+}: {
+  rxStatus: RxStatus;
+  schedule: DeaSchedule | null;
+}) {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
+      {rxStatus === "rx" ? (
+        <span
+          title="Prescription required"
+          className="rounded bg-brand-50 px-1.5 py-px text-[11px] font-semibold text-brand-700 ring-1 ring-brand-100 ring-inset"
+        >
+          Rx
+        </span>
+      ) : (
+        <span
+          title="Over the counter"
+          className="rounded bg-slate-100 px-1.5 py-px text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200 ring-inset"
+        >
+          OTC
+        </span>
+      )}
+      {schedule && (
+        <span
+          title={`DEA Schedule ${schedule} controlled substance`}
+          className="rounded bg-red-50 px-1.5 py-px text-[11px] font-semibold text-red-700 ring-1 ring-red-200 ring-inset"
+        >
+          C-{schedule}
+        </span>
+      )}
     </span>
   );
 }

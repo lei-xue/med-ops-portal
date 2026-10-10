@@ -59,3 +59,9 @@ export function formatRelative(
   }
   return formatDateTime(value);
 }
+
+/** "1 tube", "2 tubes", "100 mL": stock units are stored in the plural. */
+export function formatQuantity(quantity: number, unit: string): string {
+  const singular = quantity === 1 && unit.endsWith("s") ? unit.slice(0, -1) : unit;
+  return `${quantity.toLocaleString("en-US")} ${singular}`;
+}

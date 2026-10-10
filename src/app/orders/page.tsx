@@ -2,28 +2,19 @@ import { Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { Avatar } from "@/components/Avatar";
-import { StatusBadge } from "@/components/badges";
+import { OrdersTable } from "@/components/OrdersTable";
 import { PageHeader } from "@/components/PageHeader";
-import { RelativeTime } from "@/components/RelativeTime";
 import {
   btnPrimary,
   btnSecondary,
   btnSecondarySm,
   card,
   fieldSm,
-  td,
-  th,
 } from "@/components/ui";
-import { ORDER_STATUSES, type UserRole } from "@/db/schema";
+import { ORDER_STATUSES } from "@/db/schema";
 import { requirePageSession } from "@/lib/pageSession";
 import { STATUS_LABELS } from "@/lib/permissions";
-import {
-  countOrdersByStatus,
-  listOrders,
-  type OrderRow as OrderRowData,
-} from "@/lib/queries";
-import OrderRowActions from "./OrderRowActions";
+import { countOrdersByStatus, listOrders } from "@/lib/queries";
 
 interface OrdersPageProps {
   searchParams: Promise<{
@@ -66,7 +57,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
     <>
       <PageHeader
         title="Medication orders"
-        description="Track every order from intake through verification, fill and hand-off."
+        description="Every order links to its patient, prescriber and product. Track it from intake through verification, fill and hand-off."
         actions={
           <Link href="/orders/new" className={btnPrimary}>
             <Plus aria-hidden className="size-4" />
@@ -108,8 +99,8 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
               type="search"
               name="q"
               defaultValue={q}
-              aria-label="Search patient or medication"
-              placeholder="Search patient or medication"
+              aria-label="Search patient, MRN, drug or prescriber"
+              placeholder="Search patient, MRN, drug or prescriber"
               className={`${fieldSm} w-full pl-9 sm:w-80`}
             />
             <button type="submit" className={btnSecondary}>
@@ -122,35 +113,8 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
           </span>
         </div>
 
-        <div className="overflow-x-auto border-t border-slate-200">
-          <table className="w-full min-w-3xl text-left text-sm">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className={th}>Order ID</th>
-                <th className={th}>Patient</th>
-                <th className={th}>Medication</th>
-                <th className={`${th} text-right`}>Qty</th>
-                <th className={th}>Status</th>
-                <th className={th}>Created</th>
-                <th className={`${th} text-right`}>Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {rows.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-4 py-14 text-center text-sm text-slate-500"
-                  >
-                    No orders match the current filters.
-                  </td>
-                </tr>
-              )}
-              {rows.map((row) => (
-                <OrderRow key={row.id} row={row} role={role} />
-              ))}
-            </tbody>
-          </table>
+        <div className="border-t border-slate-200">
+          <OrdersTable rows={rows} role={role} />
         </div>
 
         {pageCount > 1 && (
@@ -213,45 +177,5 @@ function FilterTab({
         {count}
       </span>
     </Link>
-  );
-}
-
-function OrderRow({ row, role }: { row: OrderRowData; role: UserRole }) {
-  return (
-    <tr className="hover:bg-slate-50/70">
-      <td className={`${td} font-mono text-xs text-slate-500`}>
-        ORD-{String(row.id).padStart(5, "0")}
-      </td>
-      <td className={td}>
-        <div className="flex items-center gap-3">
-          <Avatar name={row.patientName} />
-          <div className="min-w-0">
-            <div className="font-medium">{row.patientName}</div>
-            {row.notes && (
-              <div className="max-w-56 truncate text-xs text-slate-500">
-                {row.notes}
-              </div>
-            )}
-          </div>
-        </div>
-      </td>
-      <td className={td}>
-        <div>{row.medicationName}</div>
-        <div className="text-xs text-slate-500">
-          {row.medicationStrength} · {row.medicationForm}
-        </div>
-      </td>
-      <td className={`${td} text-right tabular-nums`}>{row.quantity}</td>
-      <td className={td}>
-        <StatusBadge status={row.status} />
-      </td>
-      <td className={td}>
-        <RelativeTime value={row.createdAt} className="text-slate-700" />
-        <div className="text-xs text-slate-500">by {row.createdByName}</div>
-      </td>
-      <td className={`${td} text-right`}>
-        <OrderRowActions orderId={row.id} status={row.status} role={role} />
-      </td>
-    </tr>
   );
 }

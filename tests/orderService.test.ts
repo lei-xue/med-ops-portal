@@ -24,6 +24,8 @@ import {
   closeDb,
   resetDatabase,
   seedMedication,
+  seedParties,
+  seedPatient,
   seedUser,
   warmPool,
 } from "./helpers";
@@ -105,7 +107,7 @@ describe("orderService lifecycle", () => {
     const med = await seedMedication(50, 10);
 
     const order = await createOrder(db, tech, {
-      patientName: "Riley Sample",
+      ...(await seedParties("Riley Sample")),
       medicationId: med.id,
       quantity: 3,
       notes: "unit test",
@@ -128,7 +130,7 @@ describe("orderService lifecycle", () => {
     const med = await seedMedication();
 
     const order = await createOrder(db, tech, {
-      patientName: "Casey Lorem",
+      ...(await seedParties("Casey Lorem")),
       medicationId: med.id,
       quantity: 2,
     });
@@ -143,7 +145,7 @@ describe("orderService lifecycle", () => {
     const med = await seedMedication();
 
     const order = await createOrder(db, tech, {
-      patientName: "Avery Example",
+      ...(await seedParties("Avery Example")),
       medicationId: med.id,
       quantity: 1,
     });
@@ -160,7 +162,7 @@ describe("orderService lifecycle", () => {
     const med = await seedMedication();
 
     const order = await createOrder(db, tech, {
-      patientName: "Jamie Template",
+      ...(await seedParties("Jamie Template")),
       medicationId: med.id,
       quantity: 1,
     });
@@ -177,7 +179,7 @@ describe("orderService lifecycle", () => {
     const med = await seedMedication();
 
     const order = await createOrder(db, tech, {
-      patientName: "Jordan Placeholder",
+      ...(await seedParties("Jordan Placeholder")),
       medicationId: med.id,
       quantity: 1,
     });
@@ -194,7 +196,7 @@ describe("orderService lifecycle", () => {
     const med = await seedMedication();
 
     const order = await createOrder(db, tech, {
-      patientName: "Morgan Dummy",
+      ...(await seedParties("Morgan Dummy")),
       medicationId: med.id,
       quantity: 1,
     });
@@ -209,7 +211,7 @@ describe("orderService lifecycle", () => {
     const med = await seedMedication();
 
     const order = await createOrder(db, tech, {
-      patientName: "Sam Fictional",
+      ...(await seedParties("Sam Fictional")),
       medicationId: med.id,
       quantity: 1,
     });
@@ -228,7 +230,7 @@ describe("orderService role enforcement (server-side)", () => {
     const med = await seedMedication();
 
     const order = await createOrder(db, tech, {
-      patientName: "A",
+      ...(await seedParties("A")),
       medicationId: med.id,
       quantity: 1,
     });
@@ -243,7 +245,7 @@ describe("orderService role enforcement (server-side)", () => {
     const med = await seedMedication();
 
     const order = await createOrder(db, tech, {
-      patientName: "B",
+      ...(await seedParties("B")),
       medicationId: med.id,
       quantity: 1,
     });
@@ -270,7 +272,7 @@ describe("fill transaction behavior", () => {
     const med = await seedMedication(10, 2);
 
     const order = await createOrder(db, tech, {
-      patientName: "Stocky McStockface",
+      ...(await seedParties("Stocky McStockface")),
       medicationId: med.id,
       quantity: 4,
     });
@@ -307,7 +309,7 @@ describe("fill transaction behavior", () => {
     const med = await seedMedication(3, 1);
 
     const order = await createOrder(db, tech, {
-      patientName: "Greedy Grabber",
+      ...(await seedParties("Greedy Grabber")),
       medicationId: med.id,
       quantity: 5,
     });
@@ -346,7 +348,7 @@ describe("fill transaction behavior", () => {
     expect(isLowStock(med)).toBe(false);
 
     const order = await createOrder(db, tech, {
-      patientName: "Threshold Tester",
+      ...(await seedParties("Threshold Tester")),
       medicationId: med.id,
       quantity: 4,
     });
@@ -407,17 +409,19 @@ describe("inventory adjust", () => {
 });
 
 describe("createOrder validation", () => {
-  it("rejects blank patient names", async () => {
+  it("rejects unknown patients with NOT_FOUND", async () => {
     const tech = await seedUser("technician");
     const med = await seedMedication();
+    const { prescriberId } = await seedParties();
 
     await expect(
       createOrder(db, tech, {
-        patientName: "   ",
+        patientId: 99999,
+        prescriberId,
         medicationId: med.id,
         quantity: 1,
       }),
-    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("rejects non-positive quantities", async () => {
@@ -426,7 +430,7 @@ describe("createOrder validation", () => {
 
     await expect(
       createOrder(db, tech, {
-        patientName: "A",
+        ...(await seedParties("A")),
         medicationId: med.id,
         quantity: 0,
       }),
@@ -438,7 +442,7 @@ describe("createOrder validation", () => {
 
     await expect(
       createOrder(db, tech, {
-        patientName: "A",
+        ...(await seedParties("A")),
         medicationId: 99999,
         quantity: 1,
       }),
@@ -456,9 +460,9 @@ describe("concurrency (row locks)", () => {
     // missing lock reliably shows up as negative stock.
     const orders = [];
     for (let i = 0; i < 8; i += 1) {
-      const patientName = `Race ${i}`;
+      const parties = await seedParties(`Race ${i}`);
       const order = await createOrder(db, tech, {
-        patientName,
+        ...parties,
         medicationId: med.id,
         quantity: 5,
       });
@@ -498,7 +502,7 @@ describe("concurrency (row locks)", () => {
     const pharm = await seedUser("pharmacist");
     const med = await seedMedication(50, 1);
     const order = await createOrder(db, tech, {
-      patientName: "Double Click",
+      ...(await seedParties("Double Click")),
       medicationId: med.id,
       quantity: 10,
     });
@@ -529,7 +533,7 @@ describe("concurrency (row locks)", () => {
     const admin = await seedUser("admin");
     const med = await seedMedication();
     const order = await createOrder(db, tech, {
-      patientName: "Contested",
+      ...(await seedParties("Contested")),
       medicationId: med.id,
       quantity: 1,
     });
@@ -586,5 +590,101 @@ describe("inventory adjust (optimistic concurrency)", () => {
       expectedQuantity: 100,
     });
     expect(updated.stockQuantity).toBe(120);
+  });
+});
+
+describe("prescription rules", () => {
+  it("requires a prescriber for prescription-only products", async () => {
+    const tech = await seedUser("technician");
+    const patient = await seedPatient();
+    const med = await seedMedication(100, 10, { rxStatus: "rx" });
+
+    await expect(
+      createOrder(db, tech, { patientId: patient.id, medicationId: med.id, quantity: 1 }),
+    ).rejects.toMatchObject({ code: "INVALID_INPUT", field: "prescriberId" });
+  });
+
+  it("allows OTC products without a prescriber", async () => {
+    const tech = await seedUser("technician");
+    const patient = await seedPatient("Counter Customer");
+    const med = await seedMedication(100, 10, { rxStatus: "otc" });
+
+    const order = await createOrder(db, tech, {
+      patientId: patient.id,
+      medicationId: med.id,
+      quantity: 2,
+      directions: "Take 1 tablet as needed",
+    });
+    expect(order.prescriberId).toBeNull();
+    expect(order.directions).toBe("Take 1 tablet as needed");
+
+    const [audit] = await db
+      .select()
+      .from(auditLogs)
+      .where(eq(auditLogs.entityId, order.id));
+    expect(audit.details).toMatchObject({
+      patientId: patient.id,
+      patientName: "Counter Customer",
+      prescriberId: null,
+    });
+  });
+
+  it("refuses refills on Schedule II controlled substances", async () => {
+    const tech = await seedUser("technician");
+    const med = await seedMedication(100, 10, { deaSchedule: "II" });
+
+    await expect(
+      createOrder(db, tech, {
+        ...(await seedParties()),
+        medicationId: med.id,
+        quantity: 30,
+        refills: 1,
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_INPUT", field: "refills" });
+  });
+
+  it("caps Schedule III–V refills at 5", async () => {
+    const tech = await seedUser("technician");
+    const med = await seedMedication(100, 10, { deaSchedule: "IV" });
+
+    await expect(
+      createOrder(db, tech, {
+        ...(await seedParties()),
+        medicationId: med.id,
+        quantity: 30,
+        refills: 6,
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_INPUT", field: "refills" });
+
+    const ok = await createOrder(db, tech, {
+      ...(await seedParties()),
+      medicationId: med.id,
+      quantity: 30,
+      refills: 5,
+    });
+    expect(ok.refills).toBe(5);
+  });
+
+  it("caps non-controlled refills at 11 and validates days supply", async () => {
+    const tech = await seedUser("technician");
+    const med = await seedMedication();
+
+    await expect(
+      createOrder(db, tech, {
+        ...(await seedParties()),
+        medicationId: med.id,
+        quantity: 30,
+        refills: 12,
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_INPUT", field: "refills" });
+
+    await expect(
+      createOrder(db, tech, {
+        ...(await seedParties()),
+        medicationId: med.id,
+        quantity: 30,
+        daysSupply: 0,
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_INPUT", field: "daysSupply" });
   });
 });

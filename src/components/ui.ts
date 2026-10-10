@@ -33,3 +33,7 @@ export const th =
   "px-4 py-2.5 text-xs font-medium whitespace-nowrap text-slate-500";
 
 export const td = "px-4 py-3";
+
+/** Inline link to another record (patient, prescriber, medication, order). */
+export const recordLink =
+  "font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:text-brand-700 hover:decoration-brand-500";

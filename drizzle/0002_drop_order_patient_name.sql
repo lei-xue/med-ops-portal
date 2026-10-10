@@ -1,0 +1,1 @@
+ALTER TABLE "medication_orders" DROP COLUMN "patient_name";

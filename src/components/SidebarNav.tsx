@@ -6,6 +6,8 @@ import {
   History,
   LayoutDashboard,
   Pill,
+  Stethoscope,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -21,6 +23,8 @@ const NAV_ITEMS: {
 }[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/orders", label: "Orders", icon: ClipboardList },
+  { href: "/patients", label: "Patients", icon: Users },
+  { href: "/prescribers", label: "Prescribers", icon: Stethoscope },
   { href: "/medications", label: "Inventory", icon: Pill },
   {
     href: "/audit",
