@@ -36,7 +36,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-canvas text-slate-900">
-        {session ? (
+        {session?.user?.role ? (
           <AppShell
             user={{
               name: session.user.name ?? "",

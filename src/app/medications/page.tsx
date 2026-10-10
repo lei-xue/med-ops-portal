@@ -1,11 +1,11 @@
 import { Boxes, Pill, TriangleAlert, type LucideIcon } from "lucide-react";
 import type { Metadata } from "next";
 
-import { auth } from "@/auth";
 import { StockBadge } from "@/components/badges";
 import { PageHeader } from "@/components/PageHeader";
 import { StockGauge } from "@/components/StockGauge";
 import { card, td, th } from "@/components/ui";
+import { requirePageSession } from "@/lib/pageSession";
 import { isLowStock } from "@/lib/permissions";
 import { listMedications } from "@/lib/queries";
 import AdjustStockForm from "./AdjustStockForm";
@@ -13,8 +13,8 @@ import AdjustStockForm from "./AdjustStockForm";
 export const metadata: Metadata = { title: "Inventory" };
 
 export default async function MedicationsPage() {
-  const session = await auth();
-  const isAdmin = session?.user.role === "admin";
+  const session = await requirePageSession();
+  const isAdmin = session.user.role === "admin";
   const medications = await listMedications();
   const lowStockCount = medications.filter(isLowStock).length;
   const totalUnits = medications.reduce((sum, m) => sum + m.stockQuantity, 0);

@@ -33,7 +33,7 @@ const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
 
 export default async function LoginPage() {
   const session = await auth();
-  if (session) redirect("/");
+  if (session?.user?.role) redirect("/");
 
   return (
     <div className="flex min-h-screen">

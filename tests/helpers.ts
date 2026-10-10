@@ -57,3 +57,15 @@ export async function seedMedication(
     .returning();
   return med;
 }
+
+/**
+ * Open `n` pooled connections up front. Without this, the first transaction
+ * in a race finishes on an idle connection while the rest are still
+ * connecting, which accidentally serialises "concurrent" tests.
+ */
+export async function warmPool(n: number): Promise<void> {
+  const clients = await Promise.all(
+    Array.from({ length: n }, () => pool.connect()),
+  );
+  for (const client of clients) client.release();
+}

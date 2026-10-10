@@ -2,7 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/db";
-import { fieldErrorsFrom, getApiSession, handleServiceError, unauthorized } from "@/lib/api";
+import {
+  fieldErrorsFrom,
+  getApiSession,
+  handleServiceError,
+  payloadTooLarge,
+  readJsonBody,
+  unauthorized,
+} from "@/lib/api";
 import { createOrder } from "@/lib/orderService";
 
 const createOrderSchema = z.object({
@@ -20,7 +27,9 @@ export async function POST(req: NextRequest) {
   const session = await getApiSession(req);
   if (!session) return unauthorized();
 
-  const body: unknown = await req.json().catch(() => null);
+  const read = await readJsonBody(req);
+  if (read.tooLarge) return payloadTooLarge();
+  const body = read.body;
   const parsed = createOrderSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

@@ -10,12 +10,12 @@ import { auth } from "@/auth";
  */
 export default auth((req) => {
   const { pathname } = req.nextUrl;
-  const isLoggedIn = Boolean(req.auth);
+  const isLoggedIn = Boolean(req.auth?.user?.role);
 
   if (!isLoggedIn && pathname !== "/login") {
     const loginUrl = new URL("/login", req.url);
     if (pathname !== "/") {
-      loginUrl.searchParams.set("callbackUrl", pathname);
+      loginUrl.searchParams.set("callbackUrl", pathname + req.nextUrl.search);
     }
     return NextResponse.redirect(loginUrl);
   }

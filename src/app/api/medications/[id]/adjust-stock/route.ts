@@ -2,7 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/db";
-import { getApiSession, handleServiceError, unauthorized } from "@/lib/api";
+import {
+  getApiSession,
+  handleServiceError,
+  payloadTooLarge,
+  readJsonBody,
+  unauthorized,
+} from "@/lib/api";
 import { adjustStock } from "@/lib/orderService";
 
 const adjustStockSchema = z.object({
@@ -12,6 +18,7 @@ const adjustStockSchema = z.object({
     .min(0, "Quantity cannot be negative.")
     .max(1_000_000, "Quantity is unreasonably large."),
   reason: z.string().trim().max(200).optional(),
+  expectedQuantity: z.number().int().min(0).optional(),
 });
 
 export async function POST(
@@ -30,7 +37,9 @@ export async function POST(
     );
   }
 
-  const body: unknown = await req.json().catch(() => null);
+  const read = await readJsonBody(req);
+  if (read.tooLarge) return payloadTooLarge();
+  const body = read.body;
   const parsed = adjustStockSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -44,6 +53,7 @@ export async function POST(
       medicationId,
       quantity: parsed.data.quantity,
       reason: parsed.data.reason ?? null,
+      expectedQuantity: parsed.data.expectedQuantity,
     });
     return NextResponse.json({ medication });
   } catch (err) {

@@ -1,7 +1,29 @@
+import { CLINIC_TIME_ZONE } from "@/lib/clinicTime";
+
+// Explicit fields rather than dateStyle/timeStyle: those can't be combined
+// with timeZoneName (Node 22 throws).
 const dateTimeFormat = new Intl.DateTimeFormat("en-US", {
-  dateStyle: "medium",
-  timeStyle: "short",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: CLINIC_TIME_ZONE,
+  timeZoneName: "short",
 });
+
+const longDateFormat = new Intl.DateTimeFormat("en-US", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  timeZone: CLINIC_TIME_ZONE,
+});
+
+/** "Saturday, October 10, 2026" in the clinic's time zone. */
+export function formatLongDate(value: Date | string): string {
+  return longDateFormat.format(new Date(value));
+}
 
 export function formatDateTime(value: Date | string): string {
   return dateTimeFormat.format(new Date(value));

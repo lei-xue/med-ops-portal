@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 
 import { btnPrimary, field } from "@/components/ui";
+import { safeCallbackPath } from "@/lib/safeRedirect";
 
 const DEMO_ACCOUNTS = [
   { label: "Admin", email: "admin@demo.local" },
@@ -36,9 +37,7 @@ export default function LoginForm() {
         return;
       }
       const params = new URLSearchParams(window.location.search);
-      const callbackUrl = params.get("callbackUrl");
-      window.location.href =
-        callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : "/";
+      window.location.href = safeCallbackPath(params.get("callbackUrl"));
     } catch {
       setError("Network error. Please try again.");
     } finally {

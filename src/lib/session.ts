@@ -1,6 +1,6 @@
 import { encode, getToken } from "next-auth/jwt";
 
-import type { UserRole } from "@/db/schema";
+import { USER_ROLES, type UserRole } from "@/db/schema";
 
 /**
  * Session handling for Auth.js v5 (JWT strategy).
@@ -87,12 +87,21 @@ export async function readSessionFromRequest(
     secureCookie: secure,
   });
 
-  if (!payload?.sub || typeof payload.role !== "string") return null;
+  const role = payload?.role;
+  // Fail closed on anything but a known role and a numeric user id.
+  if (
+    !payload?.sub ||
+    !Number.isInteger(Number(payload.sub)) ||
+    typeof role !== "string" ||
+    !(USER_ROLES as readonly string[]).includes(role)
+  ) {
+    return null;
+  }
   return {
     id: Number(payload.sub),
     name: typeof payload.name === "string" ? payload.name : "",
     email: typeof payload.email === "string" ? payload.email : "",
-    role: payload.role as UserRole,
+    role: role as UserRole,
   };
 }
 

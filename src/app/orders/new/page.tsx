@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
 import { PageHeader } from "@/components/PageHeader";
 import { card } from "@/components/ui";
+import { requirePageSession } from "@/lib/pageSession";
 import { roleCan } from "@/lib/permissions";
 import { listMedications } from "@/lib/queries";
 import NewOrderForm from "./NewOrderForm";
@@ -12,8 +11,7 @@ import NewOrderForm from "./NewOrderForm";
 export const metadata: Metadata = { title: "New order" };
 
 export default async function NewOrderPage() {
-  const session = await auth();
-  if (!session) redirect("/login");
+  const session = await requirePageSession();
 
   if (!roleCan(session.user.role, "create")) {
     return (

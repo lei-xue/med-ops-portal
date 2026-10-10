@@ -40,3 +40,10 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5434/medops_test
           AUTH_SECRET: ci-secret
+
+  docker:
+    # Catches a broken Dockerfile or boot script before deploy time.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t medops:ci .

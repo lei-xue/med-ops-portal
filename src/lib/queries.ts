@@ -10,11 +10,13 @@ import {
   lte,
   ne,
   or,
+  sql,
   type SQL,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { db } from "@/db";
+import { CLINIC_TIME_ZONE } from "@/lib/clinicTime";
 import {
   auditLogs,
   medications,
@@ -170,37 +172,18 @@ export async function getOrderDetail(id: number) {
 // Dashboard
 // ---------------------------------------------------------------------------
 
+/** Counts the dashboard needs beyond the per-status totals. */
 export interface DashboardStats {
-  pending: number;
-  verifiedAwaitingFill: number;
-  filledAwaitingPickup: number;
   completedToday: number;
   lowStock: number;
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
+  // Midnight in the clinic's zone, computed by Postgres so the server's own
+  // zone (UTC in the container) never leaks into "today".
+  const startOfToday = sql`(date_trunc('day', now() AT TIME ZONE ${CLINIC_TIME_ZONE}) AT TIME ZONE ${CLINIC_TIME_ZONE})`;
 
-  const [
-    [pending],
-    [verified],
-    [filled],
-    [completedToday],
-    [lowStock],
-  ] = await Promise.all([
-    db
-      .select({ value: count() })
-      .from(medicationOrders)
-      .where(eq(medicationOrders.status, "pending")),
-    db
-      .select({ value: count() })
-      .from(medicationOrders)
-      .where(eq(medicationOrders.status, "verified")),
-    db
-      .select({ value: count() })
-      .from(medicationOrders)
-      .where(eq(medicationOrders.status, "filled")),
+  const [[completedToday], [lowStock]] = await Promise.all([
     db
       .select({ value: count() })
       .from(medicationOrders)
@@ -213,15 +196,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     db
       .select({ value: count() })
       .from(medications)
-      .where(
-        lte(medications.stockQuantity, medications.reorderThreshold),
-      ),
+      .where(lte(medications.stockQuantity, medications.reorderThreshold)),
   ]);
 
   return {
-    pending: pending?.value ?? 0,
-    verifiedAwaitingFill: verified?.value ?? 0,
-    filledAwaitingPickup: filled?.value ?? 0,
     completedToday: completedToday?.value ?? 0,
     lowStock: lowStock?.value ?? 0,
   };
@@ -240,8 +218,18 @@ export interface AuditFeedRow {
 
 export async function getRecentAudit(
   limit = 10,
-  { excludeLogins = false }: { excludeLogins?: boolean } = {},
+  {
+    excludeLogins = false,
+    actorId,
+  }: { excludeLogins?: boolean; actorId?: number } = {},
 ): Promise<AuditFeedRow[]> {
+  const conditions: SQL[] = [];
+  if (excludeLogins) {
+    conditions.push(ne(auditLogs.action, "user.login"));
+    conditions.push(ne(auditLogs.action, "user.login_failed"));
+  }
+  if (actorId !== undefined) conditions.push(eq(auditLogs.actorId, actorId));
+
   return db
     .select({
       id: auditLogs.id,
@@ -255,7 +243,7 @@ export async function getRecentAudit(
     })
     .from(auditLogs)
     .innerJoin(users, eq(auditLogs.actorId, users.id))
-    .where(excludeLogins ? ne(auditLogs.action, "user.login") : undefined)
+    .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
     .limit(limit);
 }

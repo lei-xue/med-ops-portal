@@ -1,9 +1,7 @@
 import { CloudOff, Database } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
 import { PageHeader } from "@/components/PageHeader";
 import { RelativeTime } from "@/components/RelativeTime";
 import { btnSecondary, card, cardHeader, td, th } from "@/components/ui";
@@ -14,6 +12,7 @@ import {
   type FhirPatient,
   type FhirResult,
 } from "@/lib/fhir";
+import { requirePageSession } from "@/lib/pageSession";
 
 export const metadata: Metadata = { title: "FHIR feed" };
 
@@ -204,8 +203,7 @@ function medicationRequestsTable(
 }
 
 export default async function FhirPage() {
-  const session = await auth();
-  if (!session) redirect("/login");
+  await requirePageSession();
 
   const [patients, medicationRequests] = await Promise.all([
     fetchPatients(),

@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { auth } from "@/auth";
 import { Avatar } from "@/components/Avatar";
 import { STATUS_STYLES, StatusBadge } from "@/components/badges";
 import { AUDIT_FALLBACK, AUDIT_ICONS, STATUS_ICONS } from "@/components/icons";
@@ -20,6 +19,7 @@ import { StockGauge } from "@/components/StockGauge";
 import { btnPrimary, card, cardHeader, td, th } from "@/components/ui";
 import type { OrderStatus, UserRole } from "@/db/schema";
 import { describeAudit } from "@/lib/audit";
+import { formatLongDate } from "@/lib/format";
 import {
   attentionStatusesFor,
   isLowStock,
@@ -32,14 +32,8 @@ import {
   listMedications,
   listOrders,
 } from "@/lib/queries";
+import { requirePageSession } from "@/lib/pageSession";
 import OrderRowActions from "./orders/OrderRowActions";
-
-const todayFormat = new Intl.DateTimeFormat("en-US", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-});
 
 const PIPELINE: { status: OrderStatus; hint: string }[] = [
   { status: "pending", hint: "Awaiting pharmacist verification" },
@@ -49,8 +43,8 @@ const PIPELINE: { status: OrderStatus; hint: string }[] = [
 ];
 
 export default async function DashboardPage() {
-  const session = await auth();
-  const role: UserRole = session?.user.role ?? "technician";
+  const session = await requirePageSession();
+  const role: UserRole = session.user.role;
   const attention = attentionStatusesFor(role);
 
   const [stats, counts, queue, medications, feed] = await Promise.all([
@@ -58,7 +52,12 @@ export default async function DashboardPage() {
     countOrdersByStatus(),
     listOrders({ statuses: attention, pageSize: 6 }),
     listMedications(),
-    getRecentAudit(6, { excludeLogins: true }),
+    // The audit log itself is pharmacist/admin only; technicians see just
+    // their own actions here so the feed doesn't bypass that boundary.
+    getRecentAudit(6, {
+      excludeLogins: true,
+      actorId: role === "technician" ? Number(session.user.id) : undefined,
+    }),
   ]);
 
   const lowStock = medications.filter(isLowStock);
@@ -67,8 +66,8 @@ export default async function DashboardPage() {
   return (
     <>
       <PageHeader
-        eyebrow={todayFormat.format(new Date())}
-        title={`Welcome back, ${session?.user.name?.split(" ")[0] ?? "there"}`}
+        eyebrow={formatLongDate(new Date())}
+        title={`Welcome back, ${session.user.name?.split(" ")[0] ?? "there"}`}
         description="Here's what needs attention on the pharmacy floor today."
         actions={
           <Link href="/orders/new" className={btnPrimary}>
@@ -81,7 +80,7 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <KpiCard
           label="Awaiting verification"
-          value={stats.pending}
+          value={counts.pending}
           footnote="Needs pharmacist review"
           icon={Clock}
           tint="bg-amber-50 text-amber-600"
@@ -90,7 +89,7 @@ export default async function DashboardPage() {
         />
         <KpiCard
           label="Ready to fill"
-          value={stats.verifiedAwaitingFill}
+          value={counts.verified}
           footnote="Verified, awaiting fill"
           icon={ShieldCheck}
           tint="bg-brand-50 text-brand-600"
@@ -135,10 +134,7 @@ export default async function DashboardPage() {
             <ol className="grid grid-cols-2 gap-y-6 sm:grid-cols-4">
               {PIPELINE.map((stage, index) => {
                 const Icon = STATUS_ICONS[stage.status];
-                const count =
-                  stage.status === "completed"
-                    ? stats.completedToday
-                    : counts[stage.status];
+                const count = counts[stage.status];
                 const active = count > 0;
                 return (
                   <li key={stage.status} className="relative">
@@ -167,12 +163,6 @@ export default async function DashboardPage() {
                         </span>
                         <span className="text-sm font-medium text-slate-700 group-hover:text-brand-600">
                           {STATUS_LABELS[stage.status]}
-                          {stage.status === "completed" && (
-                            <span className="font-normal text-slate-500">
-                              {" "}
-                              today
-                            </span>
-                          )}
                         </span>
                       </div>
                       <p className="mt-0.5 text-xs text-slate-500">
@@ -304,7 +294,7 @@ export default async function DashboardPage() {
                             <div className="truncate font-medium">
                               {order.patientName}
                             </div>
-                            <div className="font-mono text-xs text-slate-400">
+                            <div className="font-mono text-xs text-slate-500">
                               ORD-{String(order.id).padStart(5, "0")}
                             </div>
                           </div>
@@ -337,7 +327,9 @@ export default async function DashboardPage() {
 
         <section className={card}>
           <div className={cardHeader}>
-            <h2 className="text-sm font-semibold">Recent activity</h2>
+            <h2 className="text-sm font-semibold">
+              {role === "technician" ? "Your recent activity" : "Recent activity"}
+            </h2>
             {role !== "technician" && (
               <Link
                 href="/audit"
@@ -378,7 +370,7 @@ export default async function DashboardPage() {
                       </p>
                       <RelativeTime
                         value={row.createdAt}
-                        className="text-slate-400"
+                        className="text-slate-500"
                       />
                     </div>
                   </li>

@@ -1,11 +1,16 @@
 import NextAuth from "next-auth";
-import Credentials from "next-auth/providers/credentials";
 
-import type { UserRole } from "@/db/schema";
-import { verifyCredentials } from "@/lib/authService";
+import { USER_ROLES, type UserRole } from "@/db/schema";
 import { SESSION_MAX_AGE_SECONDS } from "@/lib/session";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+/**
+ * Auth.js is used only to *read* the session (`auth()` in server components
+ * and the proxy). Sessions are *minted* by POST /api/auth/login, which signs
+ * the same JWT cookie with `encode` (see src/lib/session.ts). That keeps login
+ * a plain JSON route that the API tests can call directly, so no Auth.js
+ * sign-in provider or catch-all route is configured.
+ */
+export const { auth } = NextAuth({
   session: {
     strategy: "jwt",
     maxAge: SESSION_MAX_AGE_SECONDS,
@@ -14,41 +19,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: {
     signIn: "/login",
   },
-  providers: [
-    Credentials({
-      name: "Demo credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      authorize: async (credentials) => {
-        const email = typeof credentials?.email === "string" ? credentials.email : "";
-        const password = typeof credentials?.password === "string" ? credentials.password : "";
-        if (!email || !password) return null;
-
-        const user = await verifyCredentials(email, password);
-        if (!user) return null;
-
-        return {
-          id: String(user.id),
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        };
-      },
-    }),
-  ],
+  providers: [],
   callbacks: {
-    jwt({ token, user }) {
-      if (user?.role) {
-        token.role = user.role;
-      }
-      return token;
-    },
     session({ session, token }) {
+      const role = token.role;
       session.user.id = token.sub ?? "";
-      // Credentials sessions always carry the role in the JWT payload.
-      session.user.role = token.role as UserRole;
+      // Fail closed: a token without a known role is treated as signed out
+      // by every page (they all check session.user.role).
+      session.user.role = (
+        typeof role === "string" && (USER_ROLES as readonly string[]).includes(role)
+          ? role
+          : undefined
+      ) as UserRole;
       return session;
     },
   },

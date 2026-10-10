@@ -25,6 +25,7 @@ export const AUDIT_ACTIONS = [
   "order.cancel",
   "inventory.adjust",
   "user.login",
+  "user.login_failed",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

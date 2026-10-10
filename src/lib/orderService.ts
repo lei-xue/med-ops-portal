@@ -27,7 +27,8 @@ export type ServiceErrorCode =
   | "NOT_FOUND"
   | "FORBIDDEN"
   | "INVALID_TRANSITION"
-  | "INSUFFICIENT_STOCK";
+  | "INSUFFICIENT_STOCK"
+  | "STALE_STOCK";
 
 export class OrderServiceError extends Error {
   readonly code: ServiceErrorCode;
@@ -60,6 +61,12 @@ export interface AdjustStockInput {
   medicationId: number;
   quantity: number;
   reason?: string | null;
+  /**
+   * Stock level the caller saw before editing. When given and the row has
+   * changed since, the adjustment is refused instead of silently overwriting
+   * a concurrent fill or another admin's edit (optimistic concurrency).
+   */
+  expectedQuantity?: number;
 }
 
 function requirePermission(actor: Actor, action: OrderAction): void {
@@ -336,6 +343,16 @@ export async function adjustStock(
       throw new OrderServiceError(
         "NOT_FOUND",
         `Medication ${input.medicationId} was not found.`,
+      );
+    }
+
+    if (
+      input.expectedQuantity !== undefined &&
+      medication.stockQuantity !== input.expectedQuantity
+    ) {
+      throw new OrderServiceError(
+        "STALE_STOCK",
+        `Stock changed to ${medication.stockQuantity} since you loaded the page. Review it and try again.`,
       );
     }
 

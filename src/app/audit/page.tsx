@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
 import { Avatar } from "@/components/Avatar";
 import { RoleBadge } from "@/components/badges";
 import { AUDIT_FALLBACK, AUDIT_ICONS } from "@/components/icons";
@@ -19,6 +18,7 @@ import {
 import type { UserRole } from "@/db/schema";
 import { describeAudit } from "@/lib/audit";
 import { formatDateTime } from "@/lib/format";
+import { requirePageSession } from "@/lib/pageSession";
 import { AUDIT_ACTIONS } from "@/lib/permissions";
 import { listActors, listAuditLogs } from "@/lib/queries";
 
@@ -34,8 +34,7 @@ interface AuditPageProps {
 }
 
 export default async function AuditPage({ searchParams }: AuditPageProps) {
-  const session = await auth();
-  if (!session) redirect("/login");
+  const session = await requirePageSession();
   if (session.user.role === "technician") {
     redirect("/");
   }
@@ -69,6 +68,8 @@ export default async function AuditPage({ searchParams }: AuditPageProps) {
     const qs = usp.toString();
     return qs ? `/audit?${qs}` : "/audit";
   };
+
+  if (page > pageCount) redirect(buildHref({ page: String(pageCount) }));
 
   return (
     <>
@@ -156,7 +157,7 @@ export default async function AuditPage({ searchParams }: AuditPageProps) {
                           {row.details != null && (
                             <code
                               title={JSON.stringify(row.details)}
-                              className="mt-0.5 block max-w-md truncate font-mono text-[11px] text-slate-400"
+                              className="mt-0.5 block max-w-md truncate font-mono text-[11px] text-slate-500"
                             >
                               {JSON.stringify(row.details)}
                             </code>
@@ -185,7 +186,7 @@ export default async function AuditPage({ searchParams }: AuditPageProps) {
                       </div>
                       <RelativeTime
                         value={row.createdAt}
-                        className="text-slate-400"
+                        className="text-slate-500"
                       />
                     </td>
                   </tr>

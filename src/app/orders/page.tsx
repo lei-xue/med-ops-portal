@@ -1,7 +1,7 @@
 import { Plus, Search } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
 import { Avatar } from "@/components/Avatar";
 import { StatusBadge } from "@/components/badges";
 import { PageHeader } from "@/components/PageHeader";
@@ -16,6 +16,7 @@ import {
   th,
 } from "@/components/ui";
 import { ORDER_STATUSES, type UserRole } from "@/db/schema";
+import { requirePageSession } from "@/lib/pageSession";
 import { STATUS_LABELS } from "@/lib/permissions";
 import {
   countOrdersByStatus,
@@ -33,7 +34,7 @@ interface OrdersPageProps {
 }
 
 export default async function OrdersPage({ searchParams }: OrdersPageProps) {
-  const session = await auth();
+  const session = await requirePageSession();
   const params = await searchParams;
 
   const status = ORDER_STATUSES.find((s) => s === params.status) ?? undefined;
@@ -44,7 +45,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
     listOrders({ q, status, page, pageSize: 10 }),
     countOrdersByStatus(),
   ]);
-  const role = session!.user.role;
+  const role = session.user.role;
   const allCount = Object.values(counts).reduce((a, b) => a + b, 0);
 
   // Build query strings for filter tabs / pagination while preserving state.
@@ -58,6 +59,8 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
     const qs = usp.toString();
     return qs ? `/orders?${qs}` : "/orders";
   };
+
+  if (page > pageCount) redirect(buildHref({ page: String(pageCount) }));
 
   return (
     <>

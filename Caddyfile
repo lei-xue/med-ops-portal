@@ -2,5 +2,7 @@
 # Cloudflare SSL 模式可用 Full / Full (strict)，端到端加密。
 {$DOMAIN:medops.leixue.dev} {
 	encode zstd gzip
+	# Other security headers come from the app (next.config.ts).
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
 	reverse_proxy app:3000
 }

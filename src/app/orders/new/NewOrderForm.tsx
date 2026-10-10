@@ -41,7 +41,9 @@ export default function NewOrderForm({
   const [pending, setPending] = useState(false);
 
   const selected = medications.find((m) => m.id === medicationId);
-  const quantityNum = Number.parseInt(quantity, 10);
+  // Number() rather than parseInt so "5.9" reaches the server and is rejected
+  // instead of being silently truncated to 5.
+  const quantityNum = quantity.trim() === "" ? Number.NaN : Number(quantity);
   const exceedsStock =
     selected !== undefined &&
     Number.isFinite(quantityNum) &&

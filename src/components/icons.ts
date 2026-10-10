@@ -3,6 +3,7 @@ import {
   CircleX,
   Clock,
   LogIn,
+  ShieldAlert,
   PackageCheck,
   Plus,
   ShieldCheck,
@@ -28,6 +29,7 @@ export const AUDIT_ICONS: Record<string, { icon: LucideIcon; tint: string }> = {
   "order.cancel": { icon: CircleX, tint: "bg-red-50 text-red-600" },
   "inventory.adjust": { icon: SlidersHorizontal, tint: "bg-amber-50 text-amber-700" },
   "user.login": { icon: LogIn, tint: "bg-slate-100 text-slate-500" },
+  "user.login_failed": { icon: ShieldAlert, tint: "bg-red-50 text-red-600" },
 };
 
 export const AUDIT_FALLBACK = { icon: SlidersHorizontal, tint: "bg-slate-100 text-slate-600" };

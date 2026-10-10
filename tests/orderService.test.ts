@@ -25,6 +25,7 @@ import {
   resetDatabase,
   seedMedication,
   seedUser,
+  warmPool,
 } from "./helpers";
 
 beforeEach(async () => {
@@ -442,5 +443,148 @@ describe("createOrder validation", () => {
         quantity: 1,
       }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
+describe("concurrency (row locks)", () => {
+  it("simultaneous fills competing for the same stock cannot oversell it", async () => {
+    const tech = await seedUser("technician");
+    const pharm = await seedUser("pharmacist");
+    const med = await seedMedication(5, 1);
+
+    // Eight contenders for stock that covers one: enough overlap that a
+    // missing lock reliably shows up as negative stock.
+    const orders = [];
+    for (let i = 0; i < 8; i += 1) {
+      const patientName = `Race ${i}`;
+      const order = await createOrder(db, tech, {
+        patientName,
+        medicationId: med.id,
+        quantity: 5,
+      });
+      await verifyOrder(db, pharm, order.id);
+      orders.push(order);
+    }
+
+    await warmPool(orders.length);
+    const results = await Promise.allSettled(
+      orders.map((order) => fillOrder(db, tech, order.id)),
+    );
+
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter(
+      (r): r is PromiseRejectedResult => r.status === "rejected",
+    );
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(7);
+    for (const r of rejected) {
+      expect(r.reason).toMatchObject({ code: "INSUFFICIENT_STOCK" });
+    }
+
+    const [medAfter] = await db
+      .select()
+      .from(medications)
+      .where(eq(medications.id, med.id));
+    expect(medAfter.stockQuantity).toBe(0);
+
+    const fillAudits = (await db.select().from(auditLogs)).filter(
+      (a) => a.action === "order.fill",
+    );
+    expect(fillAudits).toHaveLength(1);
+  });
+
+  it("the same order filled twice at once is filled exactly once", async () => {
+    const tech = await seedUser("technician");
+    const pharm = await seedUser("pharmacist");
+    const med = await seedMedication(50, 1);
+    const order = await createOrder(db, tech, {
+      patientName: "Double Click",
+      medicationId: med.id,
+      quantity: 10,
+    });
+    await verifyOrder(db, pharm, order.id);
+
+    await warmPool(2);
+    const results = await Promise.allSettled([
+      fillOrder(db, tech, order.id),
+      fillOrder(db, tech, order.id),
+    ]);
+
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(
+      (results.find((r) => r.status === "rejected") as PromiseRejectedResult)
+        .reason,
+    ).toMatchObject({ code: "INVALID_TRANSITION" });
+
+    const [medAfter] = await db
+      .select()
+      .from(medications)
+      .where(eq(medications.id, med.id));
+    expect(medAfter.stockQuantity).toBe(40);
+  });
+
+  it("verify racing cancel on one order: exactly one wins", async () => {
+    const tech = await seedUser("technician");
+    const pharm = await seedUser("pharmacist");
+    const admin = await seedUser("admin");
+    const med = await seedMedication();
+    const order = await createOrder(db, tech, {
+      patientName: "Contested",
+      medicationId: med.id,
+      quantity: 1,
+    });
+
+    await warmPool(2);
+    const [verify, cancel] = await Promise.allSettled([
+      verifyOrder(db, pharm, order.id),
+      cancelOrder(db, admin, order.id),
+    ]);
+
+    // Cancel is legal from both pending and verified, so it always succeeds;
+    // verify succeeds only if it took the lock first.
+    expect(cancel.status).toBe("fulfilled");
+    const [final] = await db
+      .select()
+      .from(medicationOrders)
+      .where(eq(medicationOrders.id, order.id));
+    expect(final.status).toBe("cancelled");
+    if (verify.status === "rejected") {
+      expect(verify.reason).toMatchObject({ code: "INVALID_TRANSITION" });
+    }
+  });
+});
+
+describe("inventory adjust (optimistic concurrency)", () => {
+  it("refuses an edit based on a stale stock level with STALE_STOCK", async () => {
+    const admin = await seedUser("admin");
+    const med = await seedMedication(100, 10);
+
+    await adjustStock(db, admin, { medicationId: med.id, quantity: 94 });
+
+    await expect(
+      adjustStock(db, admin, {
+        medicationId: med.id,
+        quantity: 100,
+        expectedQuantity: 100,
+      }),
+    ).rejects.toMatchObject({ code: "STALE_STOCK" });
+
+    const [medAfter] = await db
+      .select()
+      .from(medications)
+      .where(eq(medications.id, med.id));
+    expect(medAfter.stockQuantity).toBe(94);
+  });
+
+  it("applies the edit when the expected level still matches", async () => {
+    const admin = await seedUser("admin");
+    const med = await seedMedication(100, 10);
+
+    const updated = await adjustStock(db, admin, {
+      medicationId: med.id,
+      quantity: 120,
+      expectedQuantity: 100,
+    });
+    expect(updated.stockQuantity).toBe(120);
   });
 });

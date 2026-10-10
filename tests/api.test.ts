@@ -9,9 +9,12 @@ import { POST as cancelPOST } from "@/app/api/orders/[id]/cancel/route";
 import { GET as getOrderGET } from "@/app/api/orders/[id]/route";
 import { POST as fillPOST } from "@/app/api/orders/[id]/fill/route";
 import { POST as verifyPOST } from "@/app/api/orders/[id]/verify/route";
+import { GET as healthGET } from "@/app/api/health/route";
 import { POST as createOrderPOST } from "@/app/api/orders/route";
 import { db } from "@/db";
 import { auditLogs, type UserRole } from "@/db/schema";
+import { settleAuditWrites } from "@/lib/authService";
+import { resetLoginRateLimits } from "@/lib/loginRateLimit";
 import {
   closeDb,
   resetDatabase,
@@ -22,9 +25,14 @@ import {
 
 function req(
   url: string,
-  init: { method?: string; body?: unknown; cookie?: string } = {},
+  init: {
+    method?: string;
+    body?: unknown;
+    cookie?: string;
+    headers?: Record<string, string>;
+  } = {},
 ): NextRequest {
-  const headers = new Headers();
+  const headers = new Headers(init.headers);
   if (init.body !== undefined) {
     headers.set("content-type", "application/json");
   }
@@ -52,10 +60,14 @@ async function login(email: string): Promise<string> {
 }
 
 beforeEach(async () => {
+  resetLoginRateLimits();
   await resetDatabase();
 });
 
 afterEach(async () => {
+  // Failed-login audit rows are written in the background; let them land
+  // before truncating so none leak into the next test.
+  await settleAuditWrites();
   await resetDatabase();
 });
 
@@ -408,5 +420,74 @@ describe("inventory adjust through the API", () => {
       { params: Promise.resolve({ id: String(med.id) }) },
     );
     expect(res.status).toBe(400);
+  });
+});
+
+describe("login hardening", () => {
+  it("rate-limits repeated attempts on one account with 429 + Retry-After", async () => {
+    const user = await seedUser("technician");
+    const attempt = () =>
+      loginPOST(
+        req("/api/auth/login", {
+          method: "POST",
+          body: { email: user.email, password: "wrong-password" },
+          headers: { "x-forwarded-for": "203.0.113.7" },
+        }),
+      );
+
+    for (let i = 0; i < 5; i += 1) {
+      expect((await attempt()).status).toBe(401);
+    }
+    const blocked = await attempt();
+    expect(blocked.status).toBe(429);
+    expect(Number(blocked.headers.get("retry-after"))).toBeGreaterThan(0);
+  });
+
+  it("audits failed sign-ins on existing accounts with IP and user agent", async () => {
+    const user = await seedUser("pharmacist");
+    const res = await loginPOST(
+      req("/api/auth/login", {
+        method: "POST",
+        body: { email: user.email, password: "wrong-password" },
+        headers: { "x-forwarded-for": "198.51.100.4", "user-agent": "vitest" },
+      }),
+    );
+    expect(res.status).toBe(401);
+
+    await settleAuditWrites();
+    const rows = await db
+      .select()
+      .from(auditLogs)
+      .where(
+        and(
+          eq(auditLogs.action, "user.login_failed"),
+          eq(auditLogs.actorId, user.id),
+        ),
+      );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].details).toMatchObject({
+      email: user.email,
+      ip: "198.51.100.4",
+      userAgent: "vitest",
+    });
+    expect(JSON.stringify(rows[0].details)).not.toContain("wrong-password");
+  });
+
+  it("rejects oversized bodies with 413 before parsing", async () => {
+    const res = await loginPOST(
+      req("/api/auth/login", {
+        method: "POST",
+        body: { email: "a@b.co", password: "x".repeat(20_000) },
+      }),
+    );
+    expect(res.status).toBe(413);
+  });
+});
+
+describe("GET /api/health", () => {
+  it("reports ok when the database answers", async () => {
+    const res = await healthGET();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "ok" });
   });
 });

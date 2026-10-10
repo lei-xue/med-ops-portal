@@ -22,6 +22,9 @@ export function describeAudit(row: {
   if (row.action === "user.login") {
     return "signed in";
   }
+  if (row.action === "user.login_failed") {
+    return `failed sign-in attempt${typeof details.ip === "string" ? ` from ${details.ip}` : ""}`;
+  }
   if (typeof details.from === "string" && typeof details.to === "string") {
     return `moved order #${row.entityId} from ${details.from} to ${details.to}`;
   }
