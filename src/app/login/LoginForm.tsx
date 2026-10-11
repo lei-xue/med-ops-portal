@@ -2,6 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 
+import { btnPrimary, field } from "@/components/ui";
+import { safeCallbackPath } from "@/lib/safeRedirect";
+
 const DEMO_ACCOUNTS = [
   { label: "Admin", email: "admin@demo.local" },
   { label: "Pharmacist", email: "pharmacist@demo.local" },
@@ -34,9 +37,7 @@ export default function LoginForm() {
         return;
       }
       const params = new URLSearchParams(window.location.search);
-      const callbackUrl = params.get("callbackUrl");
-      window.location.href =
-        callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : "/";
+      window.location.href = safeCallbackPath(params.get("callbackUrl"));
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -49,7 +50,7 @@ export default function LoginForm() {
       <div>
         <label
           htmlFor="email"
-          className="mb-1 block text-sm font-medium text-slate-700"
+          className="mb-1.5 block text-sm font-medium text-slate-700"
         >
           Email
         </label>
@@ -60,14 +61,14 @@ export default function LoginForm() {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 focus:outline-none"
+          className={field}
           placeholder="you@demo.local"
         />
       </div>
       <div>
         <label
           htmlFor="password"
-          className="mb-1 block text-sm font-medium text-slate-700"
+          className="mb-1.5 block text-sm font-medium text-slate-700"
         >
           Password
         </label>
@@ -78,7 +79,7 @@ export default function LoginForm() {
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 focus:outline-none"
+          className={field}
           placeholder="••••••••"
         />
       </div>
@@ -86,7 +87,7 @@ export default function LoginForm() {
       {error && (
         <p
           role="alert"
-          className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
         >
           {error}
         </p>
@@ -95,16 +96,19 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-md bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
+        className={`${btnPrimary} h-10 w-full`}
       >
         {pending ? "Signing in…" : "Sign in"}
       </button>
 
-      <div className="border-t border-slate-100 pt-3">
-        <p className="mb-2 text-xs text-slate-500">
-          Demo accounts (password <code className="font-mono">{DEMO_PASSWORD}</code>):
-        </p>
-        <div className="flex flex-wrap gap-2">
+      <div className="pt-4">
+        <div className="mb-3 flex items-center gap-3 text-xs text-slate-500">
+          <span className="h-px flex-1 bg-slate-200" />
+          Demo accounts · password{" "}
+          <code className="font-mono text-slate-700">{DEMO_PASSWORD}</code>
+          <span className="h-px flex-1 bg-slate-200" />
+        </div>
+        <div className="grid grid-cols-3 gap-2">
           {DEMO_ACCOUNTS.map((account) => (
             <button
               key={account.email}
@@ -113,7 +117,12 @@ export default function LoginForm() {
                 setEmail(account.email);
                 setPassword(DEMO_PASSWORD);
               }}
-              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600 hover:border-teal-300 hover:bg-teal-50 hover:text-teal-700"
+              title={account.email}
+              className={`rounded-md border px-2 py-2 text-xs font-medium transition-colors ${
+                email === account.email
+                  ? "border-brand-500 bg-brand-50 text-brand-700"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+              }`}
             >
               {account.label}
             </button>

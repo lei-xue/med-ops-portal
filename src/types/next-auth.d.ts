@@ -10,7 +10,8 @@ declare module "next-auth" {
   interface Session {
     user: {
       id: string;
-      role: UserRole;
+      /** Undefined when the token carries no known role: treat as signed out. */
+      role?: UserRole;
     } & DefaultSession["user"];
   }
 }

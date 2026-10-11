@@ -5,9 +5,12 @@ import {
   auditLogs,
   medications,
   medicationOrders,
+  patients,
+  prescribers,
   type Medication,
   type MedicationOrder,
   type OrderStatus,
+  type Prescriber,
   type UserRole,
 } from "@/db/schema";
 import {
@@ -27,15 +30,19 @@ export type ServiceErrorCode =
   | "NOT_FOUND"
   | "FORBIDDEN"
   | "INVALID_TRANSITION"
-  | "INSUFFICIENT_STOCK";
+  | "INSUFFICIENT_STOCK"
+  | "STALE_STOCK";
 
 export class OrderServiceError extends Error {
   readonly code: ServiceErrorCode;
+  /** Input field the error is about, so forms can show it in place. */
+  readonly field?: string;
 
-  constructor(code: ServiceErrorCode, message: string) {
+  constructor(code: ServiceErrorCode, message: string, field?: string) {
     super(message);
     this.name = "OrderServiceError";
     this.code = code;
+    this.field = field;
   }
 }
 
@@ -50,16 +57,33 @@ export interface Actor {
 }
 
 export interface CreateOrderInput {
-  patientName: string;
+  patientId: number;
+  /** Required when the medication is prescription-only. */
+  prescriberId?: number | null;
   medicationId: number;
   quantity: number;
+  /** Directions for use ("sig"). */
+  directions?: string | null;
+  refills?: number;
+  daysSupply?: number | null;
   notes?: string | null;
 }
+
+/** Most refills US federal rules allow for Schedule III–V; Schedule II allows none. */
+export const MAX_REFILLS_CONTROLLED = 5;
+/** Upper bound for non-controlled prescriptions (a year of monthly fills). */
+export const MAX_REFILLS = 11;
 
 export interface AdjustStockInput {
   medicationId: number;
   quantity: number;
   reason?: string | null;
+  /**
+   * Stock level the caller saw before editing. When given and the row has
+   * changed since, the adjustment is refused instead of silently overwriting
+   * a concurrent fill or another admin's edit (optimistic concurrency).
+   */
+  expectedQuantity?: number;
 }
 
 function requirePermission(actor: Actor, action: OrderAction): void {
@@ -134,14 +158,30 @@ export async function createOrder(
 ): Promise<MedicationOrder> {
   requirePermission(actor, "create");
 
-  const patientName = input.patientName?.trim() ?? "";
-  if (!patientName) {
-    throw new OrderServiceError("INVALID_INPUT", "Patient name is required.");
-  }
   if (!Number.isInteger(input.quantity) || input.quantity < 1) {
     throw new OrderServiceError(
       "INVALID_INPUT",
       "Quantity must be a positive integer.",
+      "quantity",
+    );
+  }
+  const refills = input.refills ?? 0;
+  if (!Number.isInteger(refills) || refills < 0 || refills > MAX_REFILLS) {
+    throw new OrderServiceError(
+      "INVALID_INPUT",
+      `Refills must be a whole number from 0 to ${MAX_REFILLS}.`,
+      "refills",
+    );
+  }
+  const daysSupply = input.daysSupply ?? null;
+  if (
+    daysSupply !== null &&
+    (!Number.isInteger(daysSupply) || daysSupply < 1 || daysSupply > 365)
+  ) {
+    throw new OrderServiceError(
+      "INVALID_INPUT",
+      "Days supply must be a whole number from 1 to 365.",
+      "daysSupply",
     );
   }
 
@@ -150,7 +190,6 @@ export async function createOrder(
       .select()
       .from(medications)
       .where(eq(medications.id, input.medicationId));
-
     if (!medication) {
       throw new OrderServiceError(
         "NOT_FOUND",
@@ -158,12 +197,63 @@ export async function createOrder(
       );
     }
 
+    const [patient] = await tx
+      .select()
+      .from(patients)
+      .where(eq(patients.id, input.patientId));
+    if (!patient) {
+      throw new OrderServiceError(
+        "NOT_FOUND",
+        `Patient ${input.patientId} was not found.`,
+      );
+    }
+
+    let prescriber: Prescriber | undefined;
+    if (input.prescriberId != null) {
+      [prescriber] = await tx
+        .select()
+        .from(prescribers)
+        .where(eq(prescribers.id, input.prescriberId));
+      if (!prescriber) {
+        throw new OrderServiceError(
+          "NOT_FOUND",
+          `Prescriber ${input.prescriberId} was not found.`,
+        );
+      }
+    }
+
+    if (medication.rxStatus === "rx" && !prescriber) {
+      throw new OrderServiceError(
+        "INVALID_INPUT",
+        `${medication.name} is prescription-only: a prescriber is required.`,
+        "prescriberId",
+      );
+    }
+    if (medication.deaSchedule === "II" && refills > 0) {
+      throw new OrderServiceError(
+        "INVALID_INPUT",
+        "Schedule II controlled substances cannot be refilled; a new prescription is needed each time.",
+        "refills",
+      );
+    }
+    if (medication.deaSchedule && refills > MAX_REFILLS_CONTROLLED) {
+      throw new OrderServiceError(
+        "INVALID_INPUT",
+        `Schedule ${medication.deaSchedule} controlled substances allow at most ${MAX_REFILLS_CONTROLLED} refills.`,
+        "refills",
+      );
+    }
+
     const [order] = await tx
       .insert(medicationOrders)
       .values({
-        patientName,
+        patientId: patient.id,
+        prescriberId: prescriber?.id ?? null,
         medicationId: medication.id,
         quantity: input.quantity,
+        directions: input.directions?.trim() || null,
+        refills,
+        daysSupply,
         notes: input.notes?.trim() || null,
         status: "pending",
         createdById: actor.id,
@@ -171,10 +261,14 @@ export async function createOrder(
       .returning();
 
     await writeAudit(tx, actor, "order.create", "medication_order", order.id, {
-      patientName: order.patientName,
+      patientId: patient.id,
+      patientName: patient.name,
+      prescriberId: prescriber?.id ?? null,
+      prescriberName: prescriber?.name ?? null,
       medicationId: medication.id,
       medicationName: medication.name,
       quantity: order.quantity,
+      refills,
       status: "pending",
     });
 
@@ -336,6 +430,16 @@ export async function adjustStock(
       throw new OrderServiceError(
         "NOT_FOUND",
         `Medication ${input.medicationId} was not found.`,
+      );
+    }
+
+    if (
+      input.expectedQuantity !== undefined &&
+      medication.stockQuantity !== input.expectedQuantity
+    ) {
+      throw new OrderServiceError(
+        "STALE_STOCK",
+        `Stock changed to ${medication.stockQuantity} since you loaded the page. Review it and try again.`,
       );
     }
 

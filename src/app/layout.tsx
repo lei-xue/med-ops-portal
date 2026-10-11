@@ -1,19 +1,21 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 
-import { DemoBanner } from "@/components/DemoBanner";
-import Header from "@/components/Header";
+import { auth } from "@/auth";
+import AppShell from "@/components/AppShell";
 
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const plexSans = IBM_Plex_Sans({
+  variable: "--font-plex-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-plex-mono",
   subsets: ["latin"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
@@ -25,22 +27,28 @@ export const metadata: Metadata = {
     "Medication operations portal demo — order workflow, inventory and audit trails. All data fictional.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const session = await auth();
+
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-slate-100 text-slate-900">
-        <DemoBanner />
-        <Header />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
-          {children}
-        </main>
-        <footer className="border-t border-slate-200 py-4 text-center text-xs text-slate-400">
-          MedOps Portal — demo build. No PHI, no real patients, no dosing
-          advice.
-        </footer>
+      <body className="min-h-full bg-canvas text-slate-900">
+        {session?.user?.role ? (
+          <AppShell
+            user={{
+              name: session.user.name ?? "",
+              email: session.user.email ?? "",
+              role: session.user.role,
+            }}
+          >
+            {children}
+          </AppShell>
+        ) : (
+          children
+        )}
       </body>
     </html>
   );

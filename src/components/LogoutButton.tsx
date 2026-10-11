@@ -1,5 +1,6 @@
 "use client";
 
+import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -23,9 +24,11 @@ export default function LogoutButton() {
       type="button"
       onClick={logout}
       disabled={pending}
-      className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+      title="Sign out"
+      aria-label="Sign out"
+      className="grid size-8 place-items-center rounded-md text-slate-400 transition-colors hover:bg-nav-700 hover:text-white disabled:opacity-50"
     >
-      {pending ? "Signing out…" : "Sign out"}
+      <LogOut aria-hidden className="size-4" />
     </button>
   );
 }

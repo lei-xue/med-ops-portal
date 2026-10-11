@@ -9,22 +9,31 @@ import { POST as cancelPOST } from "@/app/api/orders/[id]/cancel/route";
 import { GET as getOrderGET } from "@/app/api/orders/[id]/route";
 import { POST as fillPOST } from "@/app/api/orders/[id]/fill/route";
 import { POST as verifyPOST } from "@/app/api/orders/[id]/verify/route";
+import { GET as healthGET } from "@/app/api/health/route";
 import { POST as createOrderPOST } from "@/app/api/orders/route";
 import { db } from "@/db";
 import { auditLogs, type UserRole } from "@/db/schema";
+import { settleAuditWrites } from "@/lib/authService";
+import { resetLoginRateLimits } from "@/lib/loginRateLimit";
 import {
   closeDb,
   resetDatabase,
   seedMedication,
+  seedParties,
   seedUser,
   TEST_PASSWORD,
 } from "./helpers";
 
 function req(
   url: string,
-  init: { method?: string; body?: unknown; cookie?: string } = {},
+  init: {
+    method?: string;
+    body?: unknown;
+    cookie?: string;
+    headers?: Record<string, string>;
+  } = {},
 ): NextRequest {
-  const headers = new Headers();
+  const headers = new Headers(init.headers);
   if (init.body !== undefined) {
     headers.set("content-type", "application/json");
   }
@@ -52,10 +61,14 @@ async function login(email: string): Promise<string> {
 }
 
 beforeEach(async () => {
+  resetLoginRateLimits();
   await resetDatabase();
 });
 
 afterEach(async () => {
+  // Failed-login audit rows are written in the background; let them land
+  // before truncating so none leak into the next test.
+  await settleAuditWrites();
   await resetDatabase();
 });
 
@@ -136,7 +149,7 @@ describe("order lifecycle through the API", () => {
     const res = await createOrderPOST(
       req("/api/orders", {
         method: "POST",
-        body: { patientName: "X", medicationId: 1, quantity: 1 },
+        body: { patientId: 1, prescriberId: 1, medicationId: 1, quantity: 1 },
       }),
     );
     expect(res.status).toBe(401);
@@ -156,7 +169,7 @@ describe("order lifecycle through the API", () => {
         method: "POST",
         cookie: techCookie,
         body: {
-          patientName: "End To End",
+          ...(await seedParties("End To End")),
           medicationId: med.id,
           quantity: 4,
           notes: "integration test",
@@ -239,7 +252,7 @@ describe("API role enforcement", () => {
       req("/api/orders", {
         method: "POST",
         cookie: techCookie,
-        body: { patientName: "Forbidden Fred", medicationId: med.id, quantity: 1 },
+        body: { ...(await seedParties("Forbidden Fred")), medicationId: med.id, quantity: 1 },
       }),
     );
     const { order } = await created.json();
@@ -270,7 +283,7 @@ describe("API role enforcement", () => {
       req(`/api/medications/${med.id}/adjust-stock`, {
         method: "POST",
         cookie: pharmCookie,
-        body: { quantity: 500 },
+        body: { quantity: 500, expectedQuantity: 0 },
       }),
       { params: Promise.resolve({ id: String(med.id) }) },
     );
@@ -280,7 +293,7 @@ describe("API role enforcement", () => {
       req(`/api/medications/${med.id}/adjust-stock`, {
         method: "POST",
         cookie: techCookie,
-        body: { quantity: 500 },
+        body: { quantity: 500, expectedQuantity: 0 },
       }),
       { params: Promise.resolve({ id: String(med.id) }) },
     );
@@ -299,7 +312,7 @@ describe("API role enforcement", () => {
       req("/api/orders", {
         method: "POST",
         cookie: techCookie,
-        body: { patientName: "Duplicate Dan", medicationId: med.id, quantity: 2 },
+        body: { ...(await seedParties("Duplicate Dan")), medicationId: med.id, quantity: 2 },
       }),
     );
     const { order } = await created.json();
@@ -329,7 +342,7 @@ describe("API role enforcement", () => {
       req("/api/orders", {
         method: "POST",
         cookie: techCookie,
-        body: { patientName: "Overeager Oliver", medicationId: med.id, quantity: 10 },
+        body: { ...(await seedParties("Overeager Oliver")), medicationId: med.id, quantity: 10 },
       }),
     );
     const { order } = await created.json();
@@ -368,7 +381,83 @@ describe("API role enforcement", () => {
   });
 });
 
+describe("prescription rules through the API", () => {
+  it("returns a field error when an Rx product has no prescriber", async () => {
+    const tech = await seedUser("technician");
+    const med = await seedMedication(20, 5, { rxStatus: "rx" });
+    const { patientId } = await seedParties("No Prescriber");
+    const cookie = await login(tech.email);
+
+    const res = await createOrderPOST(
+      req("/api/orders", {
+        method: "POST",
+        cookie,
+        body: { patientId, medicationId: med.id, quantity: 1 },
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.fieldErrors?.prescriberId?.[0]).toMatch(/prescription-only/);
+  });
+
+  it("order detail links the patient and prescriber", async () => {
+    const tech = await seedUser("technician");
+    const med = await seedMedication(20, 5);
+    const parties = await seedParties("Linked Lou");
+    const cookie = await login(tech.email);
+
+    const created = await createOrderPOST(
+      req("/api/orders", {
+        method: "POST",
+        cookie,
+        body: { ...parties, medicationId: med.id, quantity: 2, refills: 1, daysSupply: 30 },
+      }),
+    );
+    const { order } = await created.json();
+    const detail = await getOrderGET(req(`/api/orders/${order.id}`, { cookie }), {
+      params: Promise.resolve({ id: String(order.id) }),
+    });
+    const body = await detail.json();
+    expect(body.order.patient).toMatchObject({ id: parties.patientId, name: "Linked Lou" });
+    expect(body.order.prescriberId).toBe(parties.prescriberId);
+    expect(body.order).toMatchObject({ refills: 1, daysSupply: 30 });
+  });
+});
+
 describe("inventory adjust through the API", () => {
+  it("requires expectedQuantity so writes can't skip the concurrency check", async () => {
+    const admin = await seedUser("admin");
+    const med = await seedMedication(10, 5);
+    const adminCookie = await login(admin.email);
+
+    const res = await adjustStockPOST(
+      req(`/api/medications/${med.id}/adjust-stock`, {
+        method: "POST",
+        cookie: adminCookie,
+        body: { quantity: 50 },
+      }),
+      { params: Promise.resolve({ id: String(med.id) }) },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("409s with STALE_STOCK when stock moved since the admin loaded it", async () => {
+    const admin = await seedUser("admin");
+    const med = await seedMedication(10, 5);
+    const adminCookie = await login(admin.email);
+
+    const res = await adjustStockPOST(
+      req(`/api/medications/${med.id}/adjust-stock`, {
+        method: "POST",
+        cookie: adminCookie,
+        body: { quantity: 50, expectedQuantity: 12 },
+      }),
+      { params: Promise.resolve({ id: String(med.id) }) },
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "STALE_STOCK" });
+  });
+
   it("admin adjusts stock; audit row records from/to", async () => {
     const admin = await seedUser("admin");
     const med = await seedMedication(10, 5);
@@ -378,7 +467,7 @@ describe("inventory adjust through the API", () => {
       req(`/api/medications/${med.id}/adjust-stock`, {
         method: "POST",
         cookie: adminCookie,
-        body: { quantity: 100, reason: "delivery received" },
+        body: { quantity: 100, reason: "delivery received", expectedQuantity: 10 },
       }),
       { params: Promise.resolve({ id: String(med.id) }) },
     );
@@ -403,10 +492,130 @@ describe("inventory adjust through the API", () => {
       req(`/api/medications/${med.id}/adjust-stock`, {
         method: "POST",
         cookie: adminCookie,
-        body: { quantity: -5 },
+        body: { quantity: -5, expectedQuantity: 100 },
       }),
       { params: Promise.resolve({ id: String(med.id) }) },
     );
     expect(res.status).toBe(400);
+  });
+});
+
+describe("login hardening", () => {
+  it("rate-limits repeated attempts on one account with 429 + Retry-After", async () => {
+    const user = await seedUser("technician");
+    const attempt = () =>
+      loginPOST(
+        req("/api/auth/login", {
+          method: "POST",
+          body: { email: user.email, password: "wrong-password" },
+          headers: { "x-forwarded-for": "203.0.113.7" },
+        }),
+      );
+
+    for (let i = 0; i < 5; i += 1) {
+      expect((await attempt()).status).toBe(401);
+    }
+    const blocked = await attempt();
+    expect(blocked.status).toBe(429);
+    expect(Number(blocked.headers.get("retry-after"))).toBeGreaterThan(0);
+  });
+
+  it("limits attempts on one account even when they come from many addresses", async () => {
+    const user = await seedUser("technician");
+    const statuses: number[] = [];
+    for (let i = 0; i < 21; i += 1) {
+      const res = await loginPOST(
+        req("/api/auth/login", {
+          method: "POST",
+          body: { email: user.email, password: "wrong-password" },
+          headers: { "cf-connecting-ip": `198.51.100.${i}` },
+        }),
+      );
+      statuses.push(res.status);
+    }
+    expect(statuses.slice(0, 20).every((s) => s === 401)).toBe(true);
+    expect(statuses[20]).toBe(429);
+  });
+
+  it("audits failed sign-ins on existing accounts with IP and user agent", async () => {
+    const user = await seedUser("pharmacist");
+    const res = await loginPOST(
+      req("/api/auth/login", {
+        method: "POST",
+        body: { email: user.email, password: "wrong-password" },
+        headers: { "x-forwarded-for": "198.51.100.4", "user-agent": "vitest" },
+      }),
+    );
+    expect(res.status).toBe(401);
+
+    await settleAuditWrites();
+    const rows = await db
+      .select()
+      .from(auditLogs)
+      .where(
+        and(
+          eq(auditLogs.action, "user.login_failed"),
+          eq(auditLogs.actorId, user.id),
+        ),
+      );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].details).toMatchObject({
+      email: user.email,
+      ip: "198.51.100.4",
+      userAgent: "vitest",
+    });
+    expect(JSON.stringify(rows[0].details)).not.toContain("wrong-password");
+  });
+
+  it("rejects oversized bodies with 413 before parsing", async () => {
+    const res = await loginPOST(
+      req("/api/auth/login", {
+        method: "POST",
+        body: { email: "a@b.co", password: "x".repeat(20_000) },
+      }),
+    );
+    expect(res.status).toBe(413);
+  });
+});
+
+describe("GET /api/health", () => {
+  it("reports ok when the database answers", async () => {
+    const res = await healthGET();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "ok" });
+  });
+});
+
+describe("page proxy", () => {
+  type Proxy = (r: NextRequest, ctx: unknown) => Promise<Response>;
+  // Auth.js rebuilds the request URL from Host and X-Forwarded-Proto
+  // (defaulting to https). Browsers send Host; Cloudflare sets the protocol.
+  const page = (url: string, cookie?: string) =>
+    req(url, {
+      cookie,
+      headers: { host: "localhost", "x-forwarded-proto": "http" },
+    });
+
+  it("sends signed-out visitors to /login, keeping path and query", async () => {
+    const proxy = (await import("@/proxy")).default as unknown as Proxy;
+    const res = await proxy(page("/orders?status=pending"), {});
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("location")!);
+    expect(location.pathname).toBe("/login");
+    expect(location.searchParams.get("callbackUrl")).toBe(
+      "/orders?status=pending",
+    );
+  });
+
+  it("lets signed-in users through and bounces them off /login", async () => {
+    const proxy = (await import("@/proxy")).default as unknown as Proxy;
+    const user = await seedUser("pharmacist");
+    const cookie = await login(user.email);
+
+    const orders = await proxy(page("/orders", cookie), {});
+    expect(orders.headers.get("location")).toBeNull();
+
+    const loginPage = await proxy(page("/login", cookie), {});
+    expect(new URL(loginPage.headers.get("location")!).pathname).toBe("/");
   });
 });

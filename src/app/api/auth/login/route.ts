@@ -1,7 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { recordLogin, verifyCredentials } from "@/lib/authService";
+import { clientIp, payloadTooLarge, readJsonBody } from "@/lib/api";
+import {
+  auditInBackground,
+  recordFailedLogin,
+  recordLogin,
+  verifyCredentials,
+} from "@/lib/authService";
+import {
+  loginPerAccount,
+  loginPerAddress,
+  loginPerEmail,
+} from "@/lib/loginRateLimit";
 import {
   isSecureRequest,
   mintSessionToken,
@@ -13,9 +24,18 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+function tooManyAttempts(retryAfter: number): NextResponse {
+  return NextResponse.json(
+    { error: "Too many sign-in attempts. Try again in a few minutes." },
+    { status: 429, headers: { "Retry-After": String(retryAfter) } },
+  );
+}
+
 export async function POST(req: NextRequest) {
-  const body: unknown = await req.json().catch(() => null);
-  const parsed = loginSchema.safeParse(body);
+  const read = await readJsonBody(req);
+  if (read.tooLarge) return payloadTooLarge();
+
+  const parsed = loginSchema.safeParse(read.body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Enter a valid email and password." },
@@ -23,14 +43,29 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const user = await verifyCredentials(parsed.data.email, parsed.data.password);
+  const context = {
+    ip: clientIp(req),
+    userAgent: req.headers.get("user-agent"),
+  };
+  const email = parsed.data.email.trim().toLowerCase();
+
+  const byAddress = loginPerAddress.hit(context.ip);
+  if (!byAddress.ok) return tooManyAttempts(byAddress.retryAfter);
+  const byAccount = loginPerAccount.hit(`${context.ip}|${email}`);
+  if (!byAccount.ok) return tooManyAttempts(byAccount.retryAfter);
+  const byEmail = loginPerEmail.hit(email);
+  if (!byEmail.ok) return tooManyAttempts(byEmail.retryAfter);
+
+  const user = await verifyCredentials(email, parsed.data.password);
   if (!user) {
+    auditInBackground(recordFailedLogin(email, context));
     return NextResponse.json(
       { error: "Invalid email or password." },
       { status: 401 },
     );
   }
 
+  loginPerAccount.reset(`${context.ip}|${email}`);
   const secure = isSecureRequest(req);
   const token = await mintSessionToken(user, secure);
   const res = NextResponse.json({
@@ -41,6 +76,6 @@ export async function POST(req: NextRequest) {
     value: token,
   });
 
-  await recordLogin(user);
+  auditInBackground(recordLogin(user, context));
   return res;
 }

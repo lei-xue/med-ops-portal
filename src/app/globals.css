@@ -1,10 +1,30 @@
 @import "tailwindcss";
 
+/*
+ * Clinical console palette: navy navigation, one medical blue for primary
+ * actions and links, muted semantic colours for order status and stock.
+ * Neutrals come from Tailwind's slate scale.
+ */
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+}
+
+@theme {
+  --color-brand-50: #eef4fc;
+  --color-brand-100: #d9e6f8;
+  --color-brand-500: #2f6fd0;
+  --color-brand-600: #1f5bb8;
+  --color-brand-700: #184a99;
+  --color-nav-900: #0c1a2e;
+  --color-nav-800: #13243c;
+  --color-nav-700: #1c3150;
+  --color-canvas: #f3f5f8;
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.06);
 }
 
 body {
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-plex-sans), system-ui, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-slate-900);
 }

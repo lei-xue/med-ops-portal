@@ -1,12 +1,20 @@
+import { Plus, Search } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
-import { StatusBadge } from "@/components/badges";
-import { ORDER_STATUSES, type UserRole } from "@/db/schema";
-import { formatDateTime } from "@/lib/format";
+import { OrdersTable } from "@/components/OrdersTable";
+import { PageHeader } from "@/components/PageHeader";
+import {
+  btnPrimary,
+  btnSecondary,
+  btnSecondarySm,
+  card,
+  fieldSm,
+} from "@/components/ui";
+import { ORDER_STATUSES } from "@/db/schema";
+import { requirePageSession } from "@/lib/pageSession";
 import { STATUS_LABELS } from "@/lib/permissions";
-import { listOrders, type OrderRow as OrderRowData } from "@/lib/queries";
-import OrderRowActions from "./OrderRowActions";
+import { countOrdersByStatus, listOrders } from "@/lib/queries";
 
 interface OrdersPageProps {
   searchParams: Promise<{
@@ -17,21 +25,21 @@ interface OrdersPageProps {
 }
 
 export default async function OrdersPage({ searchParams }: OrdersPageProps) {
-  const session = await auth();
+  const session = await requirePageSession();
   const params = await searchParams;
 
   const status = ORDER_STATUSES.find((s) => s === params.status) ?? undefined;
   const page = Number.parseInt(params.page ?? "1", 10) || 1;
   const q = params.q ?? "";
 
-  const { rows, total, pageCount } = await listOrders({
-    q,
-    status,
-    page,
-    pageSize: 10,
-  });
+  const [{ rows, total, pageCount }, counts] = await Promise.all([
+    listOrders({ q, status, page, pageSize: 10 }),
+    countOrdersByStatus(),
+  ]);
+  const role = session.user.role;
+  const allCount = Object.values(counts).reduce((a, b) => a + b, 0);
 
-  // Build query strings for filter pills / pagination while preserving state.
+  // Build query strings for filter tabs / pagination while preserving state.
   const buildHref = (overrides: Record<string, string | undefined>) => {
     const usp = new URLSearchParams();
     const merged = { q, status, ...overrides };
@@ -43,172 +51,131 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
     return qs ? `/orders?${qs}` : "/orders";
   };
 
+  if (page > pageCount) redirect(buildHref({ page: String(pageCount) }));
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">Orders</h1>
-          <p className="text-sm text-slate-500">
-            {total} order{total === 1 ? "" : "s"}
-            {status ? ` · ${STATUS_LABELS[status]}` : ""}
-          </p>
-        </div>
-        <Link
-          href="/orders/new"
-          className="rounded-md bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-500"
-        >
-          New order
-        </Link>
-      </div>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <form action="/orders" className="flex gap-2">
-          {status && <input type="hidden" name="status" value={status} />}
-          <input
-            type="search"
-            name="q"
-            defaultValue={q}
-            placeholder="Search patient or medication…"
-            className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 focus:outline-none sm:w-72"
-          />
-          <button
-            type="submit"
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Search
-          </button>
-        </form>
-
-        <div className="flex flex-wrap items-center gap-1">
-          <Link
-            href={buildHref({ status: undefined, page: undefined })}
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              !status
-                ? "bg-teal-600 text-white"
-                : "bg-white text-slate-600 ring-1 ring-slate-200 ring-inset hover:bg-slate-50"
-            }`}
-          >
-            All
+    <>
+      <PageHeader
+        title="Medication orders"
+        description="Every order links to its patient, prescriber and product. Track it from intake through verification, fill and hand-off."
+        actions={
+          <Link href="/orders/new" className={btnPrimary}>
+            <Plus aria-hidden className="size-4" />
+            New order
           </Link>
+        }
+      />
+
+      <div className={`${card} overflow-hidden`}>
+        <nav
+          aria-label="Filter by status"
+          className="flex gap-1 overflow-x-auto border-b border-slate-200 px-3"
+        >
+          <FilterTab
+            href={buildHref({ status: undefined, page: undefined })}
+            active={!status}
+            label="All orders"
+            count={allCount}
+          />
           {ORDER_STATUSES.map((s) => (
-            <Link
+            <FilterTab
               key={s}
               href={buildHref({ status: s, page: undefined })}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                status === s
-                  ? "bg-teal-600 text-white"
-                  : "bg-white text-slate-600 ring-1 ring-slate-200 ring-inset hover:bg-slate-50"
-              }`}
-            >
-              {STATUS_LABELS[s]}
-            </Link>
+              active={status === s}
+              label={STATUS_LABELS[s]}
+              count={counts[s]}
+            />
           ))}
-        </div>
-      </div>
+        </nav>
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs tracking-wide text-slate-500 uppercase">
-            <tr>
-              <th className="px-4 py-2.5 font-medium">Order</th>
-              <th className="px-4 py-2.5 font-medium">Patient</th>
-              <th className="px-4 py-2.5 font-medium">Medication</th>
-              <th className="px-4 py-2.5 font-medium">Qty</th>
-              <th className="px-4 py-2.5 font-medium">Status</th>
-              <th className="px-4 py-2.5 font-medium">Created</th>
-              <th className="px-4 py-2.5 text-right font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {rows.length === 0 && (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-4 py-8 text-center text-slate-500"
-                >
-                  No orders match the current filters.
-                </td>
-              </tr>
-            )}
-            {rows.map((row) => (
-              <OrderRow
-                key={row.id}
-                row={row}
-                role={session!.user.role}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {pageCount > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-500">
-            Page {page} of {pageCount}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <form action="/orders" className="relative flex w-full gap-2 sm:w-auto">
+            {status && <input type="hidden" name="status" value={status} />}
+            <Search
+              aria-hidden
+              className="pointer-events-none absolute top-2.5 left-3 size-4 text-slate-400"
+            />
+            <input
+              type="search"
+              name="q"
+              defaultValue={q}
+              aria-label="Search patient, MRN, drug or prescriber"
+              placeholder="Search patient, MRN, drug or prescriber"
+              className={`${fieldSm} w-full pl-9 sm:w-80`}
+            />
+            <button type="submit" className={btnSecondary}>
+              Search
+            </button>
+          </form>
+          <span className="text-xs text-slate-500">
+            Showing {rows.length} of {total} order{total === 1 ? "" : "s"}
+            {q ? ` matching “${q}”` : ""}
           </span>
-          <div className="flex gap-2">
-            {page > 1 && (
-              <Link
-                href={buildHref({ page: String(page - 1) })}
-                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Previous
-              </Link>
-            )}
-            {page < pageCount && (
-              <Link
-                href={buildHref({ page: String(page + 1) })}
-                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Next
-              </Link>
-            )}
-          </div>
         </div>
-      )}
-    </div>
+
+        <div className="border-t border-slate-200">
+          <OrdersTable rows={rows} role={role} />
+        </div>
+
+        {pageCount > 1 && (
+          <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm">
+            <span className="text-xs text-slate-500">
+              Page {page} of {pageCount}
+            </span>
+            <div className="flex gap-2">
+              {page > 1 && (
+                <Link
+                  href={buildHref({ page: String(page - 1) })}
+                  className={btnSecondarySm}
+                >
+                  Previous
+                </Link>
+              )}
+              {page < pageCount && (
+                <Link
+                  href={buildHref({ page: String(page + 1) })}
+                  className={btnSecondarySm}
+                >
+                  Next
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
-function OrderRow({
-  row,
-  role,
+function FilterTab({
+  href,
+  active,
+  label,
+  count,
 }: {
-  row: OrderRowData;
-  role: UserRole;
+  href: string;
+  active: boolean;
+  label: string;
+  count: number;
 }) {
   return (
-    <tr className="hover:bg-slate-50/60">
-      <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
-        #{row.id}
-      </td>
-      <td className="px-4 py-2.5 font-medium text-slate-900">
-        {row.patientName}
-        {row.notes && (
-          <span className="block text-xs font-normal text-slate-400">
-            {row.notes}
-          </span>
-        )}
-      </td>
-      <td className="px-4 py-2.5 text-slate-700">
-        {row.medicationName}
-        <span className="block text-xs text-slate-400">
-          {row.medicationStrength} · {row.medicationForm}
-        </span>
-      </td>
-      <td className="px-4 py-2.5 tabular-nums text-slate-700">
-        {row.quantity}
-      </td>
-      <td className="px-4 py-2.5">
-        <StatusBadge status={row.status} />
-      </td>
-      <td className="px-4 py-2.5 text-xs text-slate-500">
-        {formatDateTime(row.createdAt)}
-        <span className="block">by {row.createdByName}</span>
-      </td>
-      <td className="px-4 py-2.5 text-right">
-        <OrderRowActions orderId={row.id} status={row.status} role={role} />
-      </td>
-    </tr>
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={`-mb-px flex items-center gap-2 border-b-2 px-3 py-3 text-sm whitespace-nowrap ${
+        active
+          ? "border-brand-600 font-medium text-brand-700"
+          : "border-transparent text-slate-500 hover:text-slate-800"
+      }`}
+    >
+      {label}
+      <span
+        className={`rounded-full px-1.5 py-px text-xs tabular-nums ${
+          active ? "bg-brand-50 text-brand-700" : "bg-slate-100 text-slate-500"
+        }`}
+      >
+        {count}
+      </span>
+    </Link>
   );
 }

@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import {
+  date,
   integer,
   jsonb,
   pgEnum,
@@ -25,6 +26,12 @@ export const orderStatusEnum = pgEnum("order_status", [
   "cancelled",
 ]);
 
+/** Prescription-only versus over-the-counter. */
+export const rxStatusEnum = pgEnum("rx_status", ["rx", "otc"]);
+
+/** US DEA controlled-substance schedule; null for non-controlled products. */
+export const deaScheduleEnum = pgEnum("dea_schedule", ["II", "III", "IV", "V"]);
+
 export const users = pgTable(
   "users",
   {
@@ -44,11 +51,19 @@ export const medications = pgTable(
   "medications",
   {
     id: serial("id").primaryKey(),
+    // Generic name; one drug usually has several products (strength × form).
     name: text("name").notNull(),
+    brandName: text("brand_name"),
+    drugClass: text("drug_class").notNull().default("Other"),
     // Fictional NDC format for the demo: 00000-0000-00
     ndc: text("ndc").notNull(),
     strength: text("strength").notNull(),
     dosageForm: text("dosage_form").notNull(),
+    route: text("route").notNull().default("oral"),
+    rxStatus: rxStatusEnum("rx_status").notNull().default("rx"),
+    deaSchedule: deaScheduleEnum("dea_schedule"),
+    // What stock is counted in: tablets, capsules, mL, inhalers, g, pens…
+    stockUnit: text("stock_unit").notNull().default("units"),
     stockQuantity: integer("stock_quantity").notNull().default(0),
     reorderThreshold: integer("reorder_threshold").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -58,15 +73,61 @@ export const medications = pgTable(
   (table) => [uniqueIndex("medications_ndc_unique").on(table.ndc)],
 );
 
+export const patients = pgTable(
+  "patients",
+  {
+    id: serial("id").primaryKey(),
+    // Fictional medical record number, e.g. MRN-000123.
+    mrn: text("mrn").notNull(),
+    name: text("name").notNull(),
+    dateOfBirth: date("date_of_birth"),
+    // Free text, e.g. "Penicillin (hives)"; null means not recorded.
+    allergies: text("allergies"),
+    phone: text("phone"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("patients_mrn_unique").on(table.mrn),
+    index("patients_name_idx").on(table.name),
+  ],
+);
+
+export const prescribers = pgTable(
+  "prescribers",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    credentials: text("credentials").notNull(),
+    // Fictional 10-digit National Provider Identifier.
+    npi: text("npi").notNull(),
+    specialty: text("specialty").notNull(),
+    practice: text("practice"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [uniqueIndex("prescribers_npi_unique").on(table.npi)],
+);
+
 export const medicationOrders = pgTable(
   "medication_orders",
   {
     id: serial("id").primaryKey(),
-    patientName: text("patient_name").notNull(),
+    patientId: integer("patient_id")
+      .notNull()
+      .references(() => patients.id),
+    // Required for prescription-only products; optional for OTC.
+    prescriberId: integer("prescriber_id").references(() => prescribers.id),
     medicationId: integer("medication_id")
       .notNull()
       .references(() => medications.id),
     quantity: integer("quantity").notNull(),
+    // Directions for use ("sig"), e.g. "Take 1 capsule by mouth three times daily".
+    directions: text("directions"),
+    refills: integer("refills").notNull().default(0),
+    daysSupply: integer("days_supply"),
     status: orderStatusEnum("status").notNull().default("pending"),
     notes: text("notes"),
     createdById: integer("created_by_id")
@@ -84,6 +145,8 @@ export const medicationOrders = pgTable(
   (table) => [
     index("medication_orders_status_idx").on(table.status),
     index("medication_orders_medication_idx").on(table.medicationId),
+    index("medication_orders_patient_idx").on(table.patientId),
+    index("medication_orders_prescriber_idx").on(table.prescriberId),
   ],
 );
 
@@ -117,12 +180,28 @@ export const medicationsRelations = relations(medications, ({ many }) => ({
   orders: many(medicationOrders),
 }));
 
+export const patientsRelations = relations(patients, ({ many }) => ({
+  orders: many(medicationOrders),
+}));
+
+export const prescribersRelations = relations(prescribers, ({ many }) => ({
+  orders: many(medicationOrders),
+}));
+
 export const medicationOrdersRelations = relations(
   medicationOrders,
   ({ one }) => ({
     medication: one(medications, {
       fields: [medicationOrders.medicationId],
       references: [medications.id],
+    }),
+    patient: one(patients, {
+      fields: [medicationOrders.patientId],
+      references: [patients.id],
+    }),
+    prescriber: one(prescribers, {
+      fields: [medicationOrders.prescriberId],
+      references: [prescribers.id],
     }),
     createdBy: one(users, {
       fields: [medicationOrders.createdById],
@@ -147,9 +226,13 @@ export type User = typeof users.$inferSelect;
 export type Medication = typeof medications.$inferSelect;
 export type MedicationOrder = typeof medicationOrders.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
+export type Patient = typeof patients.$inferSelect;
+export type Prescriber = typeof prescribers.$inferSelect;
 
 export type UserRole = (typeof userRoleEnum.enumValues)[number];
 export type OrderStatus = (typeof orderStatusEnum.enumValues)[number];
 
 export const USER_ROLES = userRoleEnum.enumValues;
 export const ORDER_STATUSES = orderStatusEnum.enumValues;
+export type RxStatus = (typeof rxStatusEnum.enumValues)[number];
+export type DeaSchedule = (typeof deaScheduleEnum.enumValues)[number];

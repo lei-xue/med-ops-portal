@@ -1,24 +1,34 @@
 # syntax=docker/dockerfile:1
 
-# ---- build stage ----
-FROM node:20-alpine AS build
+FROM node:22-alpine AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY package.json package-lock.json ./
+# ---- build: full dependency tree, compile Next.js ----
+FROM base AS build
+COPY package.json package-lock.json .npmrc ./
 RUN npm ci
-
 COPY . .
-# Next.js build (needs devDeps for drizzle/tsx at runtime anyway, keep one stage simple)
 ENV NODE_OPTIONS=--max-old-space-size=2048
 RUN npm run build
 
-# ---- runtime ----
-WORKDIR /app
-ENV NODE_ENV=production
-EXPOSE 3000
+# ---- production dependencies only ----
+# .npmrc is deliberately not copied: its include=dev would override --omit=dev.
+FROM base AS prod-deps
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
-# Entrypoint runs migrations + seed (idempotent), then starts Next
-COPY scripts/start-prod.sh /app/scripts/start-prod.sh
-RUN chmod +x /app/scripts/start-prod.sh
-CMD ["/app/scripts/start-prod.sh"]
+# ---- runtime: no dev tooling, no sources beyond what boot needs ----
+FROM base AS runtime
+ENV NODE_ENV=production
+COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/.next ./.next
+COPY --chown=node:node package.json next.config.ts tsconfig.json ./
+# Migrations and the idempotent seed run at boot (scripts/start-prod.sh).
+COPY --chown=node:node drizzle ./drizzle
+COPY --chown=node:node scripts ./scripts
+COPY --chown=node:node src/db ./src/db
+
+USER node
+EXPOSE 3000
+CMD ["sh", "/app/scripts/start-prod.sh"]

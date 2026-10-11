@@ -1,3 +1,11 @@
+# Production on littlecreek, behind the shared Cloudflare Tunnel in /opt/edge.
+# No ports are published: cloudflared reaches the app over the external
+# "edge" network as http://medops:3000. One-time setup: add the public
+# hostname (medops.leixue.dev → http://medops:3000) to the tunnel in
+# Zero Trust → Networks → Tunnels.
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+name: medops
+
 services:
   db:
     image: postgres:16-alpine
@@ -7,9 +15,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?set in .env.prod}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env.prod}
       POSTGRES_DB: ${POSTGRES_DB:-medops}
-    # loopback only — never exposed publicly
-    ports:
-      - "127.0.0.1:5433:5432"
     volumes:
       - medops-pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -29,25 +34,23 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-medops}
       AUTH_SECRET: ${AUTH_SECRET:?set in .env.prod}
       AUTH_TRUST_HOST: "true"
-    # loopback only — Caddy is the public entry
-    ports:
-      - "127.0.0.1:3000:3000"
-
-  caddy:
-    image: caddy:2-alpine
-    container_name: medops-caddy
-    restart: unless-stopped
-    depends_on:
-      - app
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
+      CLINIC_TIME_ZONE: ${CLINIC_TIME_ZONE:-America/New_York}
+    networks:
+      default:
+      edge:
+        aliases: [medops]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # Migrations + seed run before Next starts listening.
+      start_period: 60s
 
 volumes:
   medops-pgdata:
-  caddy-data:
-  caddy-config:
+
+networks:
+  # Created once with `docker network create edge`; shared with cloudflared.
+  edge:
+    external: true
