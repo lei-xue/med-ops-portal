@@ -16,6 +16,7 @@ import { formatBirthDate } from "@/lib/age";
 import { describeAudit } from "@/lib/audit";
 import { formatDateTime, formatQuantity } from "@/lib/format";
 import { requirePageSession } from "@/lib/pageSession";
+import { legalActionsFor } from "@/lib/permissions";
 import { getOrderDetail, getOrderHistory } from "@/lib/queries";
 import OrderRowActions from "../OrderRowActions";
 
@@ -55,11 +56,15 @@ export default async function OrderDetailPage({
         }
         description={`Entered ${formatDateTime(order.createdAt)} by ${order.createdByName}`}
         actions={
-          <OrderRowActions
-            orderId={order.id}
-            status={order.status}
-            role={session.user.role}
-          />
+          // Nothing to offer (e.g. a technician on a pending order): render no
+          // action area rather than the table's "—" placeholder.
+          legalActionsFor(session.user.role, order.status).length > 0 ? (
+            <OrderRowActions
+              orderId={order.id}
+              status={order.status}
+              role={session.user.role}
+            />
+          ) : undefined
         }
       />
 
