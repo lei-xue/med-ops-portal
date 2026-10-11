@@ -618,4 +618,23 @@ describe("page proxy", () => {
     const loginPage = await proxy(page("/login", cookie), {});
     expect(new URL(loginPage.headers.get("location")!).pathname).toBe("/");
   });
+
+  it("never re-issues the session cookie, so sign-out cannot be undone by a request in flight", async () => {
+    const proxy = (await import("@/proxy")).default as unknown as Proxy;
+    const user = await seedUser("technician");
+    const cookie = await login(user.email);
+
+    const res = await proxy(page("/orders", cookie), {});
+    expect(res.headers.get("location")).toBeNull();
+    expect(res.headers.get("set-cookie") ?? "").not.toMatch(/session-token/);
+  });
+
+  it("redirects to the public origin behind an HTTPS proxy", async () => {
+    const proxy = (await import("@/proxy")).default as unknown as Proxy;
+    const res = await proxy(
+      req("/orders", { headers: { host: "medops.example.com", "x-forwarded-proto": "https" } }),
+      {},
+    );
+    expect(new URL(res.headers.get("location")!).origin).toBe("https://medops.example.com");
+  });
 });
