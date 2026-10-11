@@ -6,12 +6,19 @@ Live demo: https://medops.leixue.dev — logins `tech@demo.local`, `pharmacist@d
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
-<details><summary>More screenshots</summary>
+<p align="center">
+  <img src="docs/screenshots/mobile-dashboard.png" alt="Dashboard on a phone" width="240">
+  &nbsp;
+  <img src="docs/screenshots/mobile-order.png" alt="Order detail on a phone" width="240">
+</p>
+
+<details><summary>More screenshots (taken from the live demo)</summary>
 
 | | |
 | --- | --- |
 | ![Orders](docs/screenshots/orders.png) | ![Order detail](docs/screenshots/order-detail.png) |
-| ![Inventory](docs/screenshots/inventory.png) | ![Patient](docs/screenshots/patient.png) |
+| ![Patient](docs/screenshots/patient.png) | ![Prescriber](docs/screenshots/prescriber.png) |
+| ![Inventory, controlled substances](docs/screenshots/inventory.png) | ![Medication detail](docs/screenshots/medication.png) |
 | ![New order](docs/screenshots/new-order.png) | ![Audit log](docs/screenshots/audit-log.png) |
 | ![Sign in](docs/screenshots/login.png) | ![FHIR feed](docs/screenshots/fhir-feed.png) |
 
