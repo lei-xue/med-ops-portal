@@ -57,7 +57,7 @@ Other scripts: `build`, `start`, `lint`, `typecheck`, `db:migrate:test`.
 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 ```
 
-Runs Postgres and the app (migrates + seeds at boot, as the unprivileged `node` user, with a `/api/health` healthcheck). Nothing listens on a public port: the app joins the shared `edge` Docker network as `medops`, and a Cloudflare Tunnel (`cloudflared` in `/opt/edge`) carries traffic to it. One-time setup: `docker network create edge` if it doesn't exist, then add the public hostname `medops.leixue.dev → http://medops:3000` to the tunnel in Zero Trust → Networks → Tunnels. TLS terminates at Cloudflare. Generate secrets with `openssl rand -hex 32` (hex keeps the Postgres password URL-safe, which matters because compose builds `DATABASE_URL` from it).
+Runs Postgres and the app (migrates + seeds at boot, as the unprivileged `node` user, with a `/api/health` healthcheck). The image ships Next.js's standalone server and esbuild-bundled migrate/seed scripts, with no `node_modules` install (about 310 MB). Memory is capped at 384 MB for the app and 256 MB for Postgres; the app idles around 45 MB and peaked under 80 MB in a load test. Nothing listens on a public port: the app joins the shared `edge` Docker network as `medops`, and a Cloudflare Tunnel (`cloudflared` in `/opt/edge`) carries traffic to it. One-time setup: `docker network create edge` if it doesn't exist, then add the public hostname `medops.leixue.dev → http://medops:3000` to the tunnel in Zero Trust → Networks → Tunnels. TLS terminates at Cloudflare. Generate secrets with `openssl rand -hex 32` (hex keeps the Postgres password URL-safe, which matters because compose builds `DATABASE_URL` from it).
 
 ## Security notes
 

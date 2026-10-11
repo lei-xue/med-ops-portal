@@ -11,6 +11,7 @@ services:
     image: postgres:16-alpine
     container_name: medops-db
     restart: unless-stopped
+    mem_limit: 256m
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set in .env.prod}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env.prod}
@@ -27,6 +28,9 @@ services:
     build: .
     container_name: medops-app
     restart: unless-stopped
+    # Idles around 80 MB and peaked near 140 MB under load; the V8 heap is
+    # capped at 256 MB in the Dockerfile so GC kicks in before this limit.
+    mem_limit: 384m
     depends_on:
       db:
         condition: service_healthy
