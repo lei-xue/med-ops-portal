@@ -75,3 +75,46 @@ jobs:
           done
           docker logs medops
           exit 1
+
+  e2e:
+    # Playwright against a production build and a freshly seeded database.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: medops_e2e
+        ports:
+          - 5435:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d medops_e2e"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5435/medops_e2e
+      AUTH_SECRET: ci-secret
+      AUTH_TRUST_HOST: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Migrate and seed
+        run: |
+          printf 'DATABASE_URL=%s\nAUTH_SECRET=%s\nAUTH_TRUST_HOST=true\n' "$DATABASE_URL" "$AUTH_SECRET" > .env
+          npm run db:migrate
+          npm run db:seed
+      - run: npm run build
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7

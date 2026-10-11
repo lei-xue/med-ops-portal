@@ -13,6 +13,7 @@
     "db:migrate:test": "DOTENV_PATH=.env.test tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "test": "npm run db:migrate:test && vitest run",
+    "test:e2e": "playwright test",
     "build:scripts": "esbuild scripts/migrate.ts scripts/seed.ts --bundle --platform=node --target=node22 --format=cjs --outdir=dist/scripts --out-extension:.js=.cjs --log-level=warning"
   },
   "dependencies": {
@@ -27,6 +28,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24.13.6",
     "@types/pg": "^8.23.1",
