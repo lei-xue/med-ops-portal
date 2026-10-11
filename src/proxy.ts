@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { readSessionFromRequest } from "@/lib/session";
+import { publicOrigin, readSessionFromRequest } from "@/lib/session";
 
 /**
  * Next.js 16 proxy (formerly middleware). Protects all pages:
@@ -30,19 +30,6 @@ export default async function proxy(req: NextRequest) {
   }
 
   return NextResponse.next();
-}
-
-/**
- * The origin the browser used. Behind the Cloudflare tunnel the app is
- * reached over plain HTTP, so take the protocol from X-Forwarded-Proto and the
- * host from the Host header, as Auth.js did.
- */
-function publicOrigin(req: NextRequest): string {
-  const proto =
-    req.headers.get("x-forwarded-proto")?.split(",")[0].trim() ||
-    req.nextUrl.protocol.replace(/:$/, "");
-  const host = req.headers.get("host") ?? req.nextUrl.host;
-  return `${proto}://${host}`;
 }
 
 export const config = {
