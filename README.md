@@ -7,23 +7,12 @@ A pharmacy operations console: orders go from entry to pharmacist verification, 
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
-<table>
-  <tr>
-    <td><a href="docs/screenshots/orders.png"><img src="docs/screenshots/orders.png" alt="Orders"></a></td>
-    <td><a href="docs/screenshots/order-detail.png"><img src="docs/screenshots/order-detail.png" alt="Order detail"></a></td>
-    <td><a href="docs/screenshots/inventory.png"><img src="docs/screenshots/inventory.png" alt="Inventory"></a></td>
-  </tr>
-  <tr>
-    <td><a href="docs/screenshots/patient.png"><img src="docs/screenshots/patient.png" alt="Patient"></a></td>
-    <td><a href="docs/screenshots/new-order.png"><img src="docs/screenshots/new-order.png" alt="New order"></a></td>
-    <td><a href="docs/screenshots/audit-log.png"><img src="docs/screenshots/audit-log.png" alt="Audit log"></a></td>
-  </tr>
-</table>
+![Order detail: the prescription links to its patient, prescriber and product](docs/screenshots/order-detail.png)
 
 <p align="center">
-  <img src="docs/screenshots/mobile-dashboard.png" alt="Dashboard on a phone" width="200">
-  &nbsp;
-  <img src="docs/screenshots/mobile-order.png" alt="Order on a phone" width="200">
+  <img src="docs/screenshots/mobile-dashboard.png" alt="Dashboard on a phone" width="280">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/mobile-order.png" alt="Order on a phone" width="280">
 </p>
 
 Sign in as `tech@demo.local`, `pharmacist@demo.local` or `admin@demo.local`. The password for all three is `demo1234!`.
@@ -45,4 +34,4 @@ npm run db:up && npm run db:migrate && npm run db:seed
 npm run dev    # http://localhost:3000
 ```
 
-For architecture, the data model, deployment, testing and security notes, see [docs/details.md](docs/details.md).
+For more screenshots, architecture, the data model, deployment, testing and security notes, see [docs/details.md](docs/details.md).
