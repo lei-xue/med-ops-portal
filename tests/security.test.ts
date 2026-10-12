@@ -22,6 +22,10 @@ describe("safeCallbackPath", () => {
     "/\\evil.example",
     "/\t/evil.example",
     "\\\\evil.example",
+    "/..//evil.example",
+    "/.//evil.example",
+    "/%2e%2e//evil.example",
+    "/orders/..//evil.example",
     "javascript:alert(1)",
   ])("falls back to / for %j", (input) => {
     expect(safeCallbackPath(input)).toBe("/");
