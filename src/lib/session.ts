@@ -36,6 +36,20 @@ export function isSecureRequest(req: Request): boolean {
   }
 }
 
+/**
+ * The origin the browser used. Behind the Cloudflare tunnel the app is reached
+ * over plain HTTP, so take the protocol from X-Forwarded-Proto and the host
+ * from the Host header.
+ */
+export function publicOrigin(req: Request): string {
+  const url = new URL(req.url);
+  const proto =
+    req.headers.get("x-forwarded-proto")?.split(",")[0].trim() ||
+    url.protocol.replace(/:$/, "");
+  const host = req.headers.get("host") ?? url.host;
+  return `${proto}://${host}`;
+}
+
 export interface SessionCookieOptions {
   name: string;
   httpOnly: true;

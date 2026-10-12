@@ -586,6 +586,44 @@ describe("GET /api/health", () => {
   });
 });
 
+describe("POST /api/auth/logout", () => {
+  const logout = async (headers: Record<string, string>) =>
+    (await import("@/app/api/auth/logout/route")).POST(
+      req("/api/auth/logout", { method: "POST", headers }),
+    );
+  const cleared = (res: Response) =>
+    /authjs\.session-token=;.*Max-Age=0/i.test(res.headers.get("set-cookie") ?? "");
+
+  it("sends a plain form post (no JavaScript needed) to /login with the cookie cleared", async () => {
+    const res = await logout({
+      "content-type": "application/x-www-form-urlencoded",
+      host: "localhost",
+      origin: "http://localhost",
+      "x-forwarded-proto": "http",
+    });
+    expect(res.status).toBe(303);
+    expect(new URL(res.headers.get("location")!).pathname).toBe("/login");
+    expect(cleared(res)).toBe(true);
+  });
+
+  it("refuses a form post from another site", async () => {
+    const res = await logout({
+      "content-type": "application/x-www-form-urlencoded",
+      host: "localhost",
+      origin: "https://evil.example",
+    });
+    expect(res.status).toBe(403);
+    expect(cleared(res)).toBe(false);
+  });
+
+  it("answers fetch callers with JSON", async () => {
+    const res = await logout({});
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(cleared(res)).toBe(true);
+  });
+});
+
 describe("page proxy", () => {
   type Proxy = (r: NextRequest, ctx: unknown) => Promise<Response>;
   // Auth.js rebuilds the request URL from Host and X-Forwarded-Proto
