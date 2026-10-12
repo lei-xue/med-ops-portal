@@ -13,6 +13,9 @@ export function safeCallbackPath(raw: string | null | undefined): string {
   try {
     const url = new URL(raw, PLACEHOLDER_ORIGIN);
     if (url.origin !== PLACEHOLDER_ORIGIN) return "/";
+    // Dot segments are resolved after the origin check: "/..//evil.com"
+    // normalizes to the path "//evil.com", which a browser reads as a host.
+    if (url.pathname.startsWith("//")) return "/";
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
     return "/";
