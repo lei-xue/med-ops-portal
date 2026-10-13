@@ -102,7 +102,7 @@ export default function LoginForm() {
       </button>
 
       <div className="pt-4">
-        <div className="mb-3 flex items-center gap-3 text-xs text-slate-500">
+        <div className="mb-3 flex items-center gap-3 text-xs text-slate-600">
           <span className="h-px flex-1 bg-slate-200" />
           Demo accounts · password{" "}
           <code className="font-mono text-slate-700">{DEMO_PASSWORD}</code>

@@ -95,7 +95,7 @@ export default async function LoginPage() {
             <span className="font-semibold">MedOps</span>
           </div>
           <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
-          <p className="mt-1 mb-8 text-sm text-slate-500">
+          <p className="mt-1 mb-8 text-sm text-slate-600">
             Use your staff account to access the pharmacy workspace.
           </p>
           <LoginForm />
