@@ -20,9 +20,11 @@ services:
       - medops-pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-medops}"]
-      interval: 5s
+      interval: 60s
       timeout: 3s
-      retries: 20
+      retries: 3
+      start_period: 60s
+      start_interval: 2s
 
   app:
     build: .
@@ -45,11 +47,12 @@ services:
         aliases: [medops]
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
-      interval: 10s
+      interval: 60s
       timeout: 5s
-      retries: 5
+      retries: 3
       # Migrations + seed run before Next starts listening.
       start_period: 60s
+      start_interval: 5s
 
 volumes:
   medops-pgdata:
