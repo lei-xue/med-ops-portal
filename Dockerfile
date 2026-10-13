@@ -25,6 +25,7 @@ ENV NODE_ENV=production \
     NODE_OPTIONS=--max-old-space-size=256
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
+COPY --from=build --chown=node:node /app/public ./public
 COPY --from=build --chown=node:node /app/dist/scripts ./scripts
 COPY --chown=node:node drizzle ./drizzle
 COPY --chown=node:node scripts/start-prod.sh ./scripts/start-prod.sh

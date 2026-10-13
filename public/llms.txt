@@ -1,0 +1,18 @@
+# MedOps Portal
+
+> A pharmacy medication-order workflow demo: orders move pending → verified → filled → completed, with role-based access, inventory tracking and an audit trail.
+
+MedOps Portal is a portfolio demo of a pharmacy operations console. Orders go from entry to pharmacist verification, fill and hand-off, alongside inventory levels and a full audit trail. It is aimed at developers and reviewers who want to see a realistic medication-order workflow built end to end, not at clinicians — all data is fictional. Built with Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, PostgreSQL 16, Drizzle ORM, Auth.js and Vitest, and deployed with Docker behind a Cloudflare Tunnel. Author: Sherry (Lei) Xue (https://blog.leixue.dev). Contact: hi@leixue.dev.
+
+## Key pages
+
+- [Sign in](https://medops.leixue.dev/login): Public sign-in page; every other route requires a session and redirects here.
+- [Source code](https://github.com/lei-xue/med-ops-portal): Public repository with the README, architecture notes and screenshots.
+
+## Demo accounts
+
+The sign-in page lists three public demo accounts, all with the password `demo1234!`:
+
+- `tech@demo.local` — technician
+- `pharmacist@demo.local` — pharmacist
+- `admin@demo.local` — admin

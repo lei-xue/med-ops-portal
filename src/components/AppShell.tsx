@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Avatar } from "@/components/Avatar";
 import { RoleBadge } from "@/components/badges";
 import { BrandMark } from "@/components/BrandMark";
+import ContactEmail from "@/components/ContactEmail";
 import LogoutButton from "@/components/LogoutButton";
 import SidebarNav from "@/components/SidebarNav";
 import type { UserRole } from "@/db/schema";
@@ -47,12 +48,7 @@ export default function AppShell({
         </div>
         <div className="mx-3 mb-3 rounded-md border border-dashed border-nav-700 px-3 py-2 text-[11px] leading-snug text-slate-400">
           Demo environment. All patients and orders are fictional — no PHI.
-          <a
-            href="mailto:hi@leixue.dev"
-            className="mt-1 block hover:text-white"
-          >
-            hi@leixue.dev
-          </a>
+          <ContactEmail className="mt-1 block hover:text-white" />
         </div>
         <div className="flex items-center gap-3 border-t border-nav-800 px-4 py-4">
           <Avatar name={user.name} />
