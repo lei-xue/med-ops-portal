@@ -80,6 +80,12 @@ export default async function LoginPage() {
         <p className="relative text-xs text-slate-500">
           Demo environment · synthetic data only · not for clinical use
         </p>
+        <a
+          href="mailto:hi@leixue.dev"
+          className="relative mt-1 block text-xs text-slate-500 hover:text-white"
+        >
+          hi@leixue.dev
+        </a>
       </aside>
 
       <main className="flex flex-1 items-center justify-center px-6 py-12">
