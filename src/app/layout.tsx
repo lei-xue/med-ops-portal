@@ -19,12 +19,17 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://medops.leixue.dev"),
   title: {
     default: "MedOps Portal",
     template: "%s · MedOps Portal",
   },
   description:
     "Medication operations portal demo — order workflow, inventory and audit trails. All data fictional.",
+  applicationName: "MedOps Portal",
+  authors: [{ name: "Sherry (Lei) Xue", url: "https://blog.leixue.dev" }],
+  creator: "Sherry (Lei) Xue",
+  publisher: "Sherry (Lei) Xue",
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {

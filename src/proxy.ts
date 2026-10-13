@@ -34,7 +34,9 @@ export default async function proxy(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // All pages except API routes, Next internals and static assets.
-    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // All pages except API routes, Next internals, static assets and the
+    // crawler files robots.txt, sitemap.xml, llms.txt and llms-full.txt —
+    // those must stay reachable without a session.
+    "/((?!api|_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|llms\\.txt|llms-full\\.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

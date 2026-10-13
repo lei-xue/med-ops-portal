@@ -1,0 +1,34 @@
+# MedOps Portal — full content
+
+MedOps Portal is a portfolio demo of a pharmacy operations console. Orders go from entry to pharmacist verification, fill and hand-off, alongside inventory tracking and a full audit trail. It is built for developers and reviewers who want to study a realistic medication-order workflow end to end. Everything on the site is fictional synthetic data and it is not for clinical use.
+
+Live site: https://medops.leixue.dev
+Source code: https://github.com/lei-xue/med-ops-portal
+Author: Sherry (Lei) Xue — https://blog.leixue.dev — https://github.com/lei-xue
+Contact: hi@leixue.dev
+
+## What it does
+
+- Order lifecycle: every order moves pending → verified → filled → completed, with pending or verified orders also able to be cancelled.
+- Role-based access: technician, pharmacist and admin roles are cumulative (admin ⊃ pharmacist ⊃ technician). Technicians create and fill orders; pharmacists verify, cancel and complete them and read the audit log; admins can also adjust inventory stock.
+- Prescription rules: each order links to a patient, a prescriber and one product. Rx, OTC and DEA-schedule rules are enforced on the server (for example, schedule II products allow no refills).
+- Inventory: the catalog holds 42 products across 27 drugs, split by strength and dosage form. Fills lock the order and stock rows so simultaneous fills cannot oversell stock.
+- Audit trail: every change writes its audit row in the same database transaction, so the log cannot drift from the data.
+- FHIR feed: the /fhir page reads Patient and MedicationRequest resources from the public HAPI FHIR R4 sandbox on the server, cached for five minutes.
+
+## Stack
+
+Next.js 16 (App Router, standalone output), React 19, TypeScript, Tailwind CSS v4, PostgreSQL 16, Drizzle ORM, Auth.js v5, Vitest. Deployed with Docker behind a Cloudflare Tunnel.
+
+## Demo accounts
+
+All three use the password `demo1234!`:
+
+- `tech@demo.local` — technician
+- `pharmacist@demo.local` — pharmacist
+- `admin@demo.local` — admin
+
+## Key pages
+
+- Sign in: https://medops.leixue.dev/login (the only page reachable without a session)
+- Source code: https://github.com/lei-xue/med-ops-portal
