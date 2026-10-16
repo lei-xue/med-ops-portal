@@ -12,8 +12,10 @@ export async function POST(req: NextRequest) {
     "application/x-www-form-urlencoded",
   );
   // A form post from another site could otherwise sign users out at will.
+  // Check every request, not just urlencoded ones: a cross-site form can
+  // also post text/plain or multipart/form-data.
   const origin = req.headers.get("origin");
-  if (fromForm && origin && origin !== publicOrigin(req)) {
+  if (origin && origin !== publicOrigin(req)) {
     return NextResponse.json({ error: "Cross-site sign-out refused." }, { status: 403 });
   }
 

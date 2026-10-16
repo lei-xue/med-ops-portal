@@ -555,3 +555,14 @@ export async function getPrescriberById(id: number) {
   const [row] = await db.select().from(prescribers).where(eq(prescribers.id, id));
   return row ?? null;
 }
+
+/** Distinct patients across all of a prescriber's orders, not just one page. */
+export async function countPrescriberPatients(id: number): Promise<number> {
+  const [row] = await db
+    .select({
+      value: sql<number>`count(distinct ${medicationOrders.patientId})`.mapWith(Number),
+    })
+    .from(medicationOrders)
+    .where(eq(medicationOrders.prescriberId, id));
+  return row?.value ?? 0;
+}

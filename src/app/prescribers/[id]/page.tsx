@@ -7,7 +7,11 @@ import { OrdersTable } from "@/components/OrdersTable";
 import { PageHeader } from "@/components/PageHeader";
 import { card, cardHeader } from "@/components/ui";
 import { requirePageSession } from "@/lib/pageSession";
-import { getPrescriberById, listOrders } from "@/lib/queries";
+import {
+  countPrescriberPatients,
+  getPrescriberById,
+  listOrders,
+} from "@/lib/queries";
 
 export async function generateMetadata({
   params,
@@ -23,13 +27,12 @@ export default async function PrescriberPage({
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
 
-  const [prescriber, orders] = await Promise.all([
+  const [prescriber, orders, patientCount] = await Promise.all([
     getPrescriberById(id),
     listOrders({ prescriberId: id, pageSize: 100 }),
+    countPrescriberPatients(id),
   ]);
   if (!prescriber) notFound();
-
-  const patientCount = new Set(orders.rows.map((o) => o.patientId)).size;
 
   return (
     <>

@@ -65,7 +65,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // A successful sign-in clears both account counters; otherwise visitors
+  // sharing a demo account would lock it for everyone after 20 sign-ins.
   loginPerAccount.reset(`${context.ip}|${email}`);
+  loginPerEmail.reset(email);
   const secure = isSecureRequest(req);
   const token = await mintSessionToken(user, secure);
   const res = NextResponse.json({

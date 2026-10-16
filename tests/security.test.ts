@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { clientIp } from "@/lib/api";
+import { clientIp, MAX_JSON_BODY_BYTES, readJsonBody } from "@/lib/api";
 import { RateLimiter } from "@/lib/rateLimit";
 import { safeCallbackPath } from "@/lib/safeRedirect";
 
@@ -75,5 +75,49 @@ describe("clientIp", () => {
       headers: { "x-forwarded-for": "198.51.100.1, 10.0.0.1" },
     });
     expect(clientIp(req)).toBe("198.51.100.1");
+  });
+});
+
+describe("readJsonBody", () => {
+  /** A streamed (chunked) body with no Content-Length, counting chunks pulled. */
+  const streamed = (chunks: number, chunk: Uint8Array) => {
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulled === chunks) return controller.close();
+        pulled += 1;
+        controller.enqueue(chunk);
+      },
+    });
+    const req = new Request("http://localhost/api/orders", {
+      method: "POST",
+      body,
+      duplex: "half",
+    } as RequestInit);
+    return { req, pulled: () => pulled };
+  };
+
+  it("stops reading a chunked body once it passes the cap", async () => {
+    const { req, pulled } = streamed(1_000, new Uint8Array(1024).fill(0x20));
+    expect(req.headers.get("content-length")).toBeNull();
+    expect(await readJsonBody(req)).toEqual({ tooLarge: true });
+    expect(pulled()).toBeLessThan(MAX_JSON_BODY_BYTES / 1024 + 5);
+  });
+
+  it("counts bytes, not characters", async () => {
+    // 6,000 three-byte characters: under the cap in UTF-16 units, over it in bytes.
+    const json = JSON.stringify({ notes: "€".repeat(6_000) });
+    const req = new Request("http://localhost/api/orders", { method: "POST", body: json });
+    expect(await readJsonBody(req)).toEqual({ tooLarge: true });
+  });
+
+  it("parses a small chunked body", async () => {
+    const { req } = streamed(1, new TextEncoder().encode('{"ok":true}'));
+    expect(await readJsonBody(req)).toEqual({ tooLarge: false, body: { ok: true } });
+  });
+
+  it("returns null for invalid JSON", async () => {
+    const req = new Request("http://localhost/api/orders", { method: "POST", body: "{" });
+    expect(await readJsonBody(req)).toEqual({ tooLarge: false, body: null });
   });
 });
