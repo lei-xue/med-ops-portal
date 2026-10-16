@@ -537,6 +537,20 @@ describe("login hardening", () => {
     expect(statuses[20]).toBe(429);
   });
 
+  it("does not count successful sign-ins against the per-account cap", async () => {
+    const user = await seedUser("technician");
+    for (let i = 0; i < 25; i += 1) {
+      const res = await loginPOST(
+        req("/api/auth/login", {
+          method: "POST",
+          body: { email: user.email, password: TEST_PASSWORD },
+          headers: { "cf-connecting-ip": `198.51.100.${i}` },
+        }),
+      );
+      expect(res.status).toBe(200);
+    }
+  });
+
   it("audits failed sign-ins on existing accounts with IP and user agent", async () => {
     const user = await seedUser("pharmacist");
     const res = await loginPOST(
@@ -615,6 +629,19 @@ describe("POST /api/auth/logout", () => {
     expect(res.status).toBe(403);
     expect(cleared(res)).toBe(false);
   });
+
+  it.each(["text/plain", "multipart/form-data; boundary=x"])(
+    "refuses a %s form post from another site",
+    async (contentType) => {
+      const res = await logout({
+        "content-type": contentType,
+        host: "localhost",
+        origin: "https://evil.example",
+      });
+      expect(res.status).toBe(403);
+      expect(cleared(res)).toBe(false);
+    },
+  );
 
   it("answers fetch callers with JSON", async () => {
     const res = await logout({});

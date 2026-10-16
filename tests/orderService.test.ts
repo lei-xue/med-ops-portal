@@ -9,7 +9,7 @@ import {
 } from "vitest";
 
 import { db } from "@/db";
-import { auditLogs, medications, medicationOrders } from "@/db/schema";
+import { auditLogs, medications, medicationOrders, patients } from "@/db/schema";
 import {
   adjustStock,
   cancelOrder,
@@ -20,12 +20,14 @@ import {
   verifyOrder,
 } from "@/lib/orderService";
 import { canTransition, isLowStock, roleCan } from "@/lib/permissions";
+import { countPrescriberPatients, listOrders } from "@/lib/queries";
 import {
   closeDb,
   resetDatabase,
   seedMedication,
   seedParties,
   seedPatient,
+  seedPrescriber,
   seedUser,
   warmPool,
 } from "./helpers";
@@ -686,5 +688,36 @@ describe("prescription rules", () => {
         daysSupply: 0,
       }),
     ).rejects.toMatchObject({ code: "INVALID_INPUT", field: "daysSupply" });
+  });
+});
+
+describe("prescriber stats", () => {
+  it("counts patients across every order, not just the first page", async () => {
+    const tech = await seedUser("technician");
+    const prescriber = await seedPrescriber();
+    const med = await seedMedication();
+    const people = await db
+      .insert(patients)
+      .values(
+        Array.from({ length: 101 }, (_, i) => ({
+          name: `Stat Patient ${i}`,
+          mrn: `MRN-S${String(i).padStart(5, "0")}`,
+          dateOfBirth: "1990-01-01",
+        })),
+      )
+      .returning();
+    await db.insert(medicationOrders).values(
+      people.map((p) => ({
+        patientId: p.id,
+        prescriberId: prescriber.id,
+        medicationId: med.id,
+        quantity: 1,
+        createdById: tech.id,
+      })),
+    );
+
+    const page = await listOrders({ prescriberId: prescriber.id, pageSize: 100 });
+    expect(page.rows).toHaveLength(100);
+    expect(await countPrescriberPatients(prescriber.id)).toBe(101);
   });
 });

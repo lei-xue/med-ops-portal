@@ -66,8 +66,29 @@ export async function readJsonBody(
   const declared = Number(req.headers.get("content-length") ?? "0");
   if (declared > MAX_JSON_BODY_BYTES) return { tooLarge: true };
 
-  const text = await req.text().catch(() => "");
-  if (text.length > MAX_JSON_BODY_BYTES) return { tooLarge: true };
+  // Chunked uploads carry no Content-Length, so count bytes as they arrive
+  // and stop reading as soon as the body passes the cap.
+  let text = "";
+  if (req.body) {
+    const reader = req.body.getReader();
+    const decoder = new TextDecoder();
+    let size = 0;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > MAX_JSON_BODY_BYTES) {
+          reader.cancel().catch(() => {});
+          return { tooLarge: true };
+        }
+        text += decoder.decode(value, { stream: true });
+      }
+      text += decoder.decode();
+    } catch {
+      text = "";
+    }
+  }
   try {
     return { tooLarge: false, body: JSON.parse(text) as unknown };
   } catch {
